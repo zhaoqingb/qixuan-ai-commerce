@@ -1,0 +1,37 @@
+# ===== 密钥 / 本地环境 =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+application-local.properties
+application-local.yml
+
+# 含数据库明文口令的本地配置（提交脱敏模板 application.properties.example）
+services/commerce-api/src/main/resources/application.properties
+
+# ===== 日志 / JVM 崩溃转储 =====
+*.log
+hs_err_pid*.log
+replay_pid*.log
+*.hprof
+
+# ===== 构建产物（多模块通用） =====
+target/
+build/
+!**/src/main/**/target/
+!**/src/test/**/target/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ===== IDE / 系统 =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ===== WorkBuddy 本地工作数据（不进版本库，不删除） =====
+.workbuddy/
