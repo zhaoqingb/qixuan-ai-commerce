@@ -1,27 +1,14 @@
 package com.qixuan.commerce.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 @TableName("category")
-public class Category {
-
-    @TableId(type = IdType.AUTO)
-    private Long id;
+public class Category extends BaseEntity {
 
     private Long parentId;
     private String name;
     private Integer sortOrder;
     private Integer enabled;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
 
     public Long getParentId() {
         return parentId;
