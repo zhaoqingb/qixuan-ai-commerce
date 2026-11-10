@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
-
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
@@ -170,5 +170,13 @@ public class GlobalExceptionHandler {
                                                 "MISSING_PARAMETER",
                                                 "缺少必填请求参数：" + ex.getParameterName(),
                                                 request));
+        }
+
+        @ExceptionHandler(DuplicateKeyException.class)
+        public ResponseEntity<ApiError> handleDuplicateKey(
+                        DuplicateKeyException ex,
+                        HttpServletRequest request) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(error("DUPLICATE_KEY", "数据唯一约束冲突，请检查sku编码是否重复", request));
         }
 }
