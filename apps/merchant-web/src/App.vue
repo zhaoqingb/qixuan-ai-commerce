@@ -16,6 +16,7 @@ import { RouterView } from 'vue-router'
         active-text-color="#ffffff"
       >
         <el-menu-item index="/categories"> 商品分类 </el-menu-item>
+        <el-menu-item index="/products"> 商品管理 </el-menu-item>
       </el-menu>
     </el-aside>
 
