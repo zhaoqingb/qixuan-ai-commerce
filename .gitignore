@@ -19,10 +19,18 @@ replay_pid*.log
 # ===== 构建产物（多模块通用） =====
 target/
 build/
+dist/
 !**/src/main/**/target/
 !**/src/test/**/target/
 !**/src/main/**/build/
 !**/src/test/**/build/
+
+# ===== 前端依赖 / 缓存 =====
+node_modules/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
 
 # ===== IDE / 系统 =====
 .idea/
