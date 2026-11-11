@@ -1,0 +1,125 @@
+:root {
+  --qx-brand: #ff6b35;
+  --qx-brand-dark: #e8541f;
+  --qx-brand-soft: #fff2ec;
+  --qx-ink: #1f2430;
+  --qx-ink-2: #5c6577;
+  --qx-ink-3: #98a1b2;
+  --qx-line: #e8ecf3;
+  --qx-bg: #f6f7fa;
+  --qx-card: #ffffff;
+  --qx-success: #29a86c;
+  --qx-radius: 14px;
+  --qx-shadow: 0 6px 24px rgba(31, 36, 48, 0.06);
+  --qx-shadow-lg: 0 16px 40px rgba(31, 36, 48, 0.12);
+
+  /* Element Plus 主色跟随品牌色 */
+  --el-color-primary: #ff6b35;
+  --el-color-primary-light-3: #ff8f63;
+  --el-color-primary-light-5: #ffab8a;
+  --el-color-primary-light-7: #ffc7b0;
+  --el-color-primary-light-8: #ffd6c6;
+  --el-color-primary-light-9: #fff2ec;
+  --el-color-primary-dark-2: #e8541f;
+  --el-border-radius-base: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--qx-bg);
+  color: var(--qx-ink);
+  font-family:
+    'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+.qx-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.qx-page {
+  padding: 24px 0 64px;
+}
+
+.qx-card {
+  background: var(--qx-card);
+  border-radius: var(--qx-radius);
+  box-shadow: var(--qx-shadow);
+}
+
+.qx-money {
+  font-family: 'DIN Alternate', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--qx-brand);
+  font-weight: 700;
+}
+
+.qx-money__symbol {
+  font-size: 0.72em;
+  margin-right: 2px;
+}
+
+.qx-muted {
+  color: var(--qx-ink-3);
+}
+
+.qx-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.qx-ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d8dee9;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c3cbd9;
+}
