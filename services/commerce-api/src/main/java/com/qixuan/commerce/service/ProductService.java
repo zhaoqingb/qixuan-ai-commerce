@@ -1,9 +1,14 @@
 package com.qixuan.commerce.service;
 
+import com.qixuan.commerce.common.BizStatus;
+
+import com.qixuan.commerce.dto.ProductCardView;
 import com.qixuan.commerce.dto.ProductListItem;
 import com.qixuan.commerce.dto.ProductCreateRequest;
 import com.qixuan.commerce.dto.ProductCreateResponse;
+import com.qixuan.commerce.dto.ProductDetailResponse;
 import com.qixuan.commerce.dto.ProductStatusRequest;
+
 import com.qixuan.commerce.entity.Category;
 import com.qixuan.commerce.entity.ProductSpu;
 import com.qixuan.commerce.entity.ProductSku;
@@ -29,6 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
 import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
@@ -80,7 +87,7 @@ public class ProductService {
         Store store = storeMapper.selectById(
                 request.storeId());
 
-        if (store == null || !Integer.valueOf(1).equals(store.getStatus())) {
+        if (store == null || !BizStatus.STORE_ACTIVE.equals(store.getStatus())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "店铺不存在或已停用");
@@ -98,10 +105,10 @@ public class ProductService {
 
         spu.setStoreId(request.storeId());
         spu.setCategoryId(request.categoryId());
-        spu.setName(request.name().trim());
+        spu.setTitle(request.name().trim());
         spu.setDescription(request.description());
 
-        spu.setStatus(0);
+        spu.setStatus(BizStatus.SPU_DRAFT);
         productSpuMapper.insert(spu);
 
         // MySQL自增ID回填至实体
@@ -119,8 +126,8 @@ public class ProductService {
             sku.setSpecJson(
                     jsonMapper.writeValueAsString(item.specs()));
 
-            sku.setPrice(item.price());
-            sku.setStatus(1);
+            sku.setSalePrice(item.price());
+            sku.setStatus(BizStatus.SKU_ACTIVE);
 
             productSkuMapper.insert(sku);
 
@@ -163,7 +170,7 @@ public class ProductService {
 
         // 3.检查店铺状态
         Store store = storeMapper.selectById(request.storeId());
-        if (store == null || !Integer.valueOf(1).equals(store.getStatus())) {
+        if (store == null || !BizStatus.STORE_ACTIVE.equals(store.getStatus())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "店铺不存在或已停用");
@@ -180,7 +187,8 @@ public class ProductService {
             }
             Long skuCount = productSkuMapper.selectCount(
                     new LambdaQueryWrapper<ProductSku>().eq(ProductSku::getSpuId, productId).eq(ProductSku::getStatus,
-                            1));
+                            BizStatus.SKU_ACTIVE));
+
             if (skuCount == 0) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
@@ -189,8 +197,14 @@ public class ProductService {
         }
 
         // 5.只更新商品状态与更新时间
-        LambdaUpdateWrapper<ProductSpu> wrapper = new LambdaUpdateWrapper<ProductSpu>().eq(ProductSpu::getId, productId)
-                .eq(ProductSpu::getStoreId, request.storeId()).set(ProductSpu::getStatus, request.status())
+        String targetStatus = request.status() == 1
+                ? BizStatus.SPU_ON_SALE
+                : BizStatus.SPU_OFF_SALE;
+
+        LambdaUpdateWrapper<ProductSpu> wrapper = new LambdaUpdateWrapper<ProductSpu>()
+                .eq(ProductSpu::getId, productId)
+                .eq(ProductSpu::getStoreId, request.storeId())
+                .set(ProductSpu::getStatus, targetStatus)
                 .set(ProductSpu::getUpdatedAt, LocalDateTime.now());
 
         int rows = productSpuMapper.update(null, wrapper);
@@ -200,6 +214,74 @@ public class ProductService {
                     HttpStatus.CONFLICT,
                     "商品状态更新失败，请重试");
         }
+    }
+
+    public List<ProductCardView> listOnSale(Long categoryId, String keyword) {
+        String kw = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+        return productSpuMapper.findOnSale(categoryId, kw);
+    }
+
+    public ProductDetailResponse getProductDetail(Long storeId, Long id) {
+        ProductSpu spu = productSpuMapper.selectById(id);
+        if (spu == null || !storeId.equals(spu.getStoreId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "商品不存在");
+        }
+        return buildDetail(spu);
+    }
+
+    public ProductDetailResponse getProductDetailForBuyer(Long id) {
+        ProductSpu spu = productSpuMapper.selectById(id);
+        if (spu == null || !BizStatus.SPU_ON_SALE.equals(spu.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "商品不存在或已下架");
+        }
+        return buildDetail(spu);
+    }
+
+    private ProductDetailResponse buildDetail(ProductSpu spu) {
+        List<ProductSku> skus = productSkuMapper.selectList(
+                new LambdaQueryWrapper<ProductSku>()
+                        .eq(ProductSku::getSpuId, spu.getId())
+                        .eq(ProductSku::getStatus, "ACTIVE")
+                        .orderByAsc(ProductSku::getId));
+
+        List<Long> skuIds = skus.stream().map(ProductSku::getId).toList();
+
+        Map<Long, SkuInventory> inventoryMap = skuIds.isEmpty()
+                ? Map.of()
+                : skuInventoryMapper.selectList(
+                        new LambdaQueryWrapper<SkuInventory>()
+                                .in(SkuInventory::getSkuId, skuIds))
+                        .stream()
+                        .collect(Collectors.toMap(
+                                SkuInventory::getSkuId, v -> v));
+
+        List<ProductDetailResponse.SkuView> views = skus.stream()
+                .map(sku -> {
+                    SkuInventory inv = inventoryMap.get(sku.getId());
+                    return new ProductDetailResponse.SkuView(
+                            sku.getId(),
+                            sku.getSkuCode(),
+                            sku.getSpecJson(),
+                            sku.getSalePrice(),
+                            sku.getListPrice(),
+                            inv == null ? 0 : inv.getAvailableQty());
+                })
+                .toList();
+
+        Store store = storeMapper.selectById(spu.getStoreId());
+
+        return new ProductDetailResponse(
+                spu.getId(),
+                spu.getTitle(),
+                spu.getSubtitle(),
+                spu.getMainImageUrl(),
+                spu.getDescription(),
+                spu.getStoreId(),
+                store == null ? null : store.getStoreName(),
+                spu.getCategoryId(),
+                views);
     }
 
 }

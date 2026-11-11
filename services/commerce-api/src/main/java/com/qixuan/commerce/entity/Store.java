@@ -4,24 +4,23 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 @TableName("store")
 public class Store extends BaseEntity {
+    private String storeName;
+    private String status;
 
-    private String name;
-    private Integer status;
-
-    public String getName() {
-        return name;
+    public String getStoreName() {
+        return storeName;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setStoreName(String storeName) {
+        this.storeName = storeName;
     }
 
-    public Integer getStatus()  {
+    public String getStatus() {
         return status;
     }
-    
-    public void setStatus(Integer status){
-        this.status=status;
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
 }

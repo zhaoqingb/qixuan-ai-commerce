@@ -4,6 +4,7 @@ import com.qixuan.commerce.dto.ProductListItem;
 import com.qixuan.commerce.dto.ProductCreateRequest;
 import com.qixuan.commerce.dto.ProductCreateResponse;
 import com.qixuan.commerce.dto.ProductStatusRequest;
+import com.qixuan.commerce.dto.ProductDetailResponse;
 
 import com.qixuan.commerce.service.ProductService;
 
@@ -47,6 +48,13 @@ public class ProductController {
             @PathVariable("id") Long id,
             @Valid @RequestBody ProductStatusRequest request) {
         productService.updateProductStatus(id, request);
+    }
+
+    @GetMapping("/{id}")
+    public ProductDetailResponse detail(
+            @RequestParam Long storeId,
+            @PathVariable("id") Long id) {
+        return productService.getProductDetail(storeId, id);
     }
 
 }

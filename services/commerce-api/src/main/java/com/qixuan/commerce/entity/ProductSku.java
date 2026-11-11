@@ -1,7 +1,6 @@
 
 package com.qixuan.commerce.entity;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.math.BigDecimal;
@@ -11,12 +10,10 @@ public class ProductSku extends BaseEntity {
 
     private Long spuId;
     private String skuCode;
-
-    @TableField("spec_json")
     private String specJson;
-
-    private BigDecimal price;
-    private Integer status;
+    private BigDecimal salePrice;
+    private BigDecimal listPrice;
+    private String status;
 
     public Long getSpuId() {
         return spuId;
@@ -42,19 +39,28 @@ public class ProductSku extends BaseEntity {
         this.specJson = specJson;
     }
 
-    public BigDecimal getPrice() {
-        return price;
+    public BigDecimal getSalePrice() {
+        return salePrice;
     }
 
-    public void setPrice(BigDecimal price) {
-        this.price = price;
+    public void setSalePrice(BigDecimal salePrice) {
+        this.salePrice = salePrice;
     }
 
-    public Integer getStatus() {
+    public BigDecimal getListPrice() {
+        return listPrice;
+    }
+
+    public void setListPrice(BigDecimal listPrice) {
+        this.listPrice = listPrice;
+    }
+
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(Integer status) {
+    public void setStatus(String status) {
         this.status = status;
     }
+
 }

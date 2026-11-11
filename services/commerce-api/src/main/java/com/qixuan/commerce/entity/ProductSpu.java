@@ -7,9 +7,11 @@ public class ProductSpu extends BaseEntity {
 
     private Long storeId;
     private Long categoryId;
-    private String name;
+    private String title;
+    private String subtitle;
+    private String mainImageUrl;
     private String description;
-    private Integer status;
+    private String status;
 
     public Long getStoreId() {
         return storeId;
@@ -27,12 +29,28 @@ public class ProductSpu extends BaseEntity {
         this.categoryId = categoryId;
     }
 
-    public String getName() {
-        return name;
+    public String getTitle() {
+        return title;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getSubtitle() {
+        return subtitle;
+    }
+
+    public void setSubtitle(String subtitle) {
+        this.subtitle = subtitle;
+    }
+
+    public String getMainImageUrl() {
+        return mainImageUrl;
+    }
+
+    public void setMainImageUrl(String mainImageUrl) {
+        this.mainImageUrl = mainImageUrl;
     }
 
     public String getDescription() {
@@ -43,11 +61,11 @@ public class ProductSpu extends BaseEntity {
         this.description = description;
     }
 
-    public Integer getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(Integer status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 

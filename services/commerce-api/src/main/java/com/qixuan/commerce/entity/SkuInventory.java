@@ -6,14 +6,23 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 @TableName("sku_inventory")
-public class SkuInventory extends BaseAuditEntity {
+public class SkuInventory {
 
     @TableId(value = "sku_id", type = IdType.INPUT)
     private Long skuId;
 
     private Integer availableQty;
     private Integer lockedQty;
+    private Long soldQty;
     private Integer version;
+
+    public Long getSoldQty() {
+        return soldQty;
+    }
+
+    public void setSoldQty(Long soldQty) {
+        this.soldQty = soldQty;
+    }
 
     public Long getSkuId() {
         return skuId;
