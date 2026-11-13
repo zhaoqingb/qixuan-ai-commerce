@@ -22,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.qixuan.commerce.mapper.InventoryLogMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -47,19 +48,18 @@ public class CheckoutService {
     private final StoreOrderMapper storeOrderMapper;
     private final OrderItemMapper orderItemMapper;
     private final SkuInventoryMapper skuInventoryMapper;
+    private final InventoryLogMapper inventoryLogMapper;
 
-    public CheckoutService(CartItemMapper cartItemMapper,
-            UserAddressMapper userAddressMapper,
-            TradeOrderMapper tradeOrderMapper,
-            StoreOrderMapper storeOrderMapper,
-            OrderItemMapper orderItemMapper,
-            SkuInventoryMapper skuInventoryMapper) {
+    public CheckoutService(CartItemMapper cartItemMapper, UserAddressMapper userAddressMapper,
+            TradeOrderMapper tradeOrderMapper, StoreOrderMapper storeOrderMapper, OrderItemMapper orderItemMapper,
+            SkuInventoryMapper skuInventoryMapper, InventoryLogMapper inventoryLogMapper) {
         this.cartItemMapper = cartItemMapper;
         this.userAddressMapper = userAddressMapper;
         this.tradeOrderMapper = tradeOrderMapper;
         this.storeOrderMapper = storeOrderMapper;
         this.orderItemMapper = orderItemMapper;
         this.skuInventoryMapper = skuInventoryMapper;
+        this.inventoryLogMapper = inventoryLogMapper;
     }
 
     public List<UserAddress> listAddresses(Long userId) {
@@ -187,6 +187,7 @@ public class CheckoutService {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                             "商品库存不足：" + item.productTitle());
                 }
+                inventoryLogMapper.insert(item.skuId(), orderNo, "LOCK", item.quantity());
 
                 OrderItem orderItem = new OrderItem();
                 orderItem.setStoreOrderId(sub.getId());

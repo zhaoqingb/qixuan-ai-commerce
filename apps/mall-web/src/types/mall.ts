@@ -161,3 +161,18 @@ export interface SubmitOrderResult {
   itemCount: number
   duplicated: boolean
 }
+
+/** 支付结果：接口幂等，重复调用返回同一份已支付结果 */
+export interface PayOrderResult {
+  orderNo: string
+  status: string
+  payableAmount: number
+  paidAt: string
+}
+
+/** 取消结果：超时自动关单和用户主动取消共用同一段后端逻辑 */
+export interface CancelOrderResult {
+  orderNo: string
+  status: string
+  closedAt: string
+}

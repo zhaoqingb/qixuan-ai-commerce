@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { addToCart } from '@/api/cart'
-import { fetchOrderDetail } from '@/api/order'
+import { cancelOrder, fetchOrderDetail, payOrder } from '@/api/order'
 import { CURRENT_USER_ID } from '@/config'
 import { useCartStore } from '@/stores/cart'
 import type { OrderDetailRow } from '@/types/mall'
@@ -17,6 +17,8 @@ const cartStore = useCartStore()
 const loading = ref(true)
 const rows = ref<OrderDetailRow[]>([])
 const buying = ref(false)
+const paying = ref(false)
+const cancelling = ref(false)
 
 const orderNo = computed(() => (typeof route.params.orderNo === 'string' ? route.params.orderNo : ''))
 
@@ -112,15 +114,15 @@ const STATUS_TEXT: Record<string, string> = {
   PAID: '商家备货中',
   SHIPPED: '已发货',
   COMPLETED: '交易完成',
-  CANCELLED: '订单已取消',
+  CANCELLED: '交易关闭',
 }
 
 const STATUS_HINT: Record<string, string> = {
-  PENDING_PAYMENT: '请在 24 小时内完成支付，超时订单将自动取消',
+  PENDING_PAYMENT: '请在 24 小时内完成支付，超时订单将自动关闭',
   PAID: '商家正在打包，请耐心等待发货',
   SHIPPED: '包裹已交给快递，请注意查收',
   COMPLETED: '感谢购买，期待再次光临',
-  CANCELLED: '订单已关闭，库存已释放',
+  CANCELLED: '交易已关闭，占用的库存已释放',
 }
 
 const STEPS = ['提交订单', '付款成功', '商家发货', '确认收货']
@@ -159,8 +161,42 @@ async function copyOrderNo() {
   }
 }
 
-function pay() {
-  ElMessage.info('演示环境未接入支付，订单保持「待付款」状态')
+async function pay() {
+  if (!order.value || paying.value) return
+  paying.value = true
+  try {
+    await payOrder(order.value.orderNo, CURRENT_USER_ID)
+    ElMessage.success('支付成功，商家开始备货')
+    await loadDetail()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '支付失败')
+  } finally {
+    paying.value = false
+  }
+}
+
+async function cancel() {
+  if (!order.value || cancelling.value) return
+  try {
+    await ElMessageBox.confirm(
+      '取消后商品库存会释放，订单不可恢复，确认取消该订单？',
+      '取消订单',
+      { type: 'warning', confirmButtonText: '确认取消', cancelButtonText: '再想想' },
+    )
+  } catch {
+    return
+  }
+
+  cancelling.value = true
+  try {
+    await cancelOrder(order.value.orderNo, CURRENT_USER_ID)
+    ElMessage.success('交易已关闭，库存已释放')
+    await loadDetail()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '取消失败')
+  } finally {
+    cancelling.value = false
+  }
 }
 
 async function buyAgain() {
@@ -185,7 +221,7 @@ async function buyAgain() {
   }
 }
 
-onMounted(async () => {
+async function loadDetail() {
   try {
     rows.value = await fetchOrderDetail(orderNo.value, CURRENT_USER_ID)
   } catch (error) {
@@ -193,7 +229,9 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadDetail)
 </script>
 
 <template>
@@ -371,9 +409,19 @@ onMounted(async () => {
                 type="primary"
                 size="large"
                 class="side__btn"
+                :loading="paying"
                 @click="pay()"
               >
                 去付款
+              </el-button>
+              <el-button
+                v-if="order.status === 'PENDING_PAYMENT'"
+                text
+                class="side__cancel"
+                :loading="cancelling"
+                @click="cancel()"
+              >
+                取消订单
               </el-button>
               <el-button size="large" class="side__btn" :loading="buying" @click="buyAgain">
                 再次购买
@@ -795,6 +843,18 @@ onMounted(async () => {
   margin: 0;
   border-radius: 21px;
   font-size: 14px;
+}
+
+/* 负向操作：弱化成文字按钮，不跟「去付款」抢注意力 */
+.side__cancel {
+  width: 100%;
+  margin: 0;
+  color: var(--qx-ink-3);
+}
+
+.side__cancel:hover {
+  color: #e5484d;
+  background: #fdf0f0;
 }
 
 .side__btn.el-button--primary {

@@ -22,4 +22,29 @@ public interface SkuInventoryMapper extends BaseMapper<SkuInventory> {
               AND available_qty >= #{qty}
             """)
     int lockStock(@Param("skuId") Long skuId, @Param("qty") Integer qty);
+
+    // 支付成功：锁定数量转已售。locked_qty不够说明数据已错乱，返回0
+    @Update("""
+            UPDATE sku_inventory
+            SET locked_qty = locked_qty - #{qty},
+                sold_qty = sold_qty + #{qty},
+                version = version + 1
+            WHERE sku_id = #{skuId}
+              AND locked_qty >= #{qty}
+            """)
+    int confirmStock(@Param("skuId") Long skuId, @Param("qty") Integer qty);
+
+    /**
+     * 关单/取消：把锁定数量还给可售。返回 0 说明锁定数量不足，数据已错乱。
+     */
+    @Update("""
+            UPDATE sku_inventory
+            SET locked_qty = locked_qty - #{qty},
+                available_qty = available_qty + #{qty},
+                version = version + 1
+            WHERE sku_id = #{skuId}
+              AND locked_qty >= #{qty}
+            """)
+    int releaseStock(@Param("skuId") Long skuId, @Param("qty") Integer qty);
+
 }

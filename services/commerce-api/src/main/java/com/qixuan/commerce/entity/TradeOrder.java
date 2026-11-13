@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
 
 @TableName("trade_order")
@@ -20,6 +21,25 @@ public class TradeOrder {
     private BigDecimal freightAmount;
     private BigDecimal payableAmount;
     private String status;
+    private LocalDateTime paidAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime closedAt;
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(LocalDateTime closedAt) {
+        this.closedAt = closedAt;
+    }
 
     public Long getId() {
         return id;
@@ -39,6 +59,14 @@ public class TradeOrder {
 
     public Long getUserId() {
         return userId;
+    }
+
+    public LocalDateTime getPaidAt() {
+        return paidAt;
+    }
+
+    public void setPaidAt(LocalDateTime paidAt) {
+        this.paidAt = paidAt;
     }
 
     public void setUserId(Long userId) {
