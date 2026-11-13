@@ -6,24 +6,17 @@ import com.qixuan.commerce.dto.CheckoutItemView;
 import com.qixuan.commerce.entity.CartItem;
 import org.apache.ibatis.annotations.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Mapper
 public interface CartItemMapper extends BaseMapper<CartItem> {
 
-        @ConstructorArgs({
-                        @Arg(column = "cart_item_id", javaType = Long.class, id = true),
-                        @Arg(column = "sku_id", javaType = Long.class),
-                        @Arg(column = "quantity", javaType = Integer.class),
-                        @Arg(column = "selected", javaType = Integer.class),
-                        @Arg(column = "sku_code", javaType = String.class),
-                        @Arg(column = "spec_json", javaType = String.class),
-                        @Arg(column = "sale_price", javaType = BigDecimal.class),
-                        @Arg(column = "product_title", javaType = String.class),
-                        @Arg(column = "image_url", javaType = String.class),
-                        @Arg(column = "available_qty", javaType = Long.class)
-        })
+        /**
+         * 结果映射说明：
+         * SELECT 的列顺序必须与 CartItemView 的 record 组件顺序完全一致，
+         * MyBatis 会按位置自动调用 record 的规范构造器完成映射，
+         * 因此不需要 @ConstructorArgs / @Arg 显式声明。
+         */
         @Select("""
                         SELECT
                             ci.id AS cart_item_id,
@@ -45,19 +38,9 @@ public interface CartItemMapper extends BaseMapper<CartItem> {
                         """)
         List<CartItemView> findByUserId(@Param("userId") Long userId);
 
-        @ConstructorArgs({
-                        @Arg(column = "cart_item_id", javaType = Long.class, id = true),
-                        @Arg(column = "sku_id", javaType = Long.class),
-                        @Arg(column = "spu_id", javaType = Long.class),
-                        @Arg(column = "store_id", javaType = Long.class),
-                        @Arg(column = "store_name", javaType = String.class),
-                        @Arg(column = "product_title", javaType = String.class),
-                        @Arg(column = "image_url", javaType = String.class),
-                        @Arg(column = "spec_json", javaType = String.class),
-                        @Arg(column = "sale_price", javaType = BigDecimal.class),
-                        @Arg(column = "quantity", javaType = Integer.class),
-                        @Arg(column = "available_qty", javaType = Long.class)
-        })
+        /**
+         * 结果映射说明：列顺序需与 CheckoutItemView 的 record 组件顺序一致。
+         */
         @Select("""
                         SELECT
                             ci.id AS cart_item_id,

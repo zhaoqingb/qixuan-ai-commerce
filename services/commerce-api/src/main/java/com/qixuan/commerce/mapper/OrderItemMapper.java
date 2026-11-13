@@ -8,11 +8,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
-import java.math.BigDecimal;
 import java.util.List;
-
-import org.apache.ibatis.annotations.Arg;
-import org.apache.ibatis.annotations.ConstructorArgs;
 
 @Mapper
 public interface OrderItemMapper extends BaseMapper<OrderItem> {
@@ -25,26 +21,11 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             """)
     int countQuantityByTradeOrder(@Param("tradeOrderId") Long tradeOrderId);
 
-    @ConstructorArgs({
-            @Arg(column = "order_item_id", javaType = Long.class, id = true),
-            @Arg(column = "trade_order_id", javaType = Long.class),
-            @Arg(column = "order_no", javaType = String.class),
-            @Arg(column = "status", javaType = String.class),
-            @Arg(column = "created_at", javaType = String.class),
-            @Arg(column = "goods_amount", javaType = BigDecimal.class),
-            @Arg(column = "freight_amount", javaType = BigDecimal.class),
-            @Arg(column = "payable_amount", javaType = BigDecimal.class),
-            @Arg(column = "store_id", javaType = Long.class),
-            @Arg(column = "store_name", javaType = String.class),
-            @Arg(column = "spu_id", javaType = Long.class),
-            @Arg(column = "sku_id", javaType = Long.class),
-            @Arg(column = "product_title", javaType = String.class),
-            @Arg(column = "image_url", javaType = String.class),
-            @Arg(column = "spec_json", javaType = String.class),
-            @Arg(column = "unit_price", javaType = BigDecimal.class),
-            @Arg(column = "quantity", javaType = Integer.class),
-            @Arg(column = "item_payable_amount", javaType = BigDecimal.class)
-    })
+    /**
+     * 结果映射说明：
+     * SELECT 的列顺序必须与 OrderItemRow 的 record 组件顺序完全一致，
+     * MyBatis 按位置调用 record 的规范构造器完成映射，无需 @ConstructorArgs。
+     */
     @Select("""
             SELECT
                 oi.id AS order_item_id,
@@ -74,31 +55,9 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
             """)
     List<OrderItemRow> findByUserId(@Param("userId") Long userId);
 
-    @ConstructorArgs({
-            @Arg(column = "order_item_id", javaType = Long.class, id = true),
-            @Arg(column = "trade_order_id", javaType = Long.class),
-            @Arg(column = "order_no", javaType = String.class),
-            @Arg(column = "status", javaType = String.class),
-            @Arg(column = "created_at", javaType = String.class),
-            @Arg(column = "goods_amount", javaType = BigDecimal.class),
-            @Arg(column = "freight_amount", javaType = BigDecimal.class),
-            @Arg(column = "discount_amount", javaType = BigDecimal.class),
-            @Arg(column = "payable_amount", javaType = BigDecimal.class),
-            @Arg(column = "address_snapshot", javaType = String.class),
-            @Arg(column = "sub_order_no", javaType = String.class),
-            @Arg(column = "sub_freight_amount", javaType = BigDecimal.class),
-            @Arg(column = "sub_payable_amount", javaType = BigDecimal.class),
-            @Arg(column = "store_id", javaType = Long.class),
-            @Arg(column = "store_name", javaType = String.class),
-            @Arg(column = "spu_id", javaType = Long.class),
-            @Arg(column = "sku_id", javaType = Long.class),
-            @Arg(column = "product_title", javaType = String.class),
-            @Arg(column = "image_url", javaType = String.class),
-            @Arg(column = "spec_json", javaType = String.class),
-            @Arg(column = "unit_price", javaType = BigDecimal.class),
-            @Arg(column = "quantity", javaType = Integer.class),
-            @Arg(column = "item_payable_amount", javaType = BigDecimal.class)
-    })
+    /**
+     * 结果映射说明：列顺序需与 OrderDetailRow 的 record 组件顺序一致。
+     */
     @Select("""
             SELECT
                 oi.id AS order_item_id,

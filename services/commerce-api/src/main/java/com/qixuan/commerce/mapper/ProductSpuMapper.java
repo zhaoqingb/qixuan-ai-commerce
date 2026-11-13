@@ -6,26 +6,19 @@ import com.qixuan.commerce.dto.ProductListItem;
 import com.qixuan.commerce.entity.ProductSpu;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.ConstructorArgs;
-import org.apache.ibatis.annotations.Arg;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Mapper
 public interface ProductSpuMapper extends BaseMapper<ProductSpu> {
 
-    @ConstructorArgs({
-            @Arg(column = "id", javaType = Long.class, id = true),
-            @Arg(column = "name", javaType = String.class),
-            @Arg(column = "category_name", javaType = String.class),
-            @Arg(column = "store_name", javaType = String.class),
-            @Arg(column = "min_price", javaType = BigDecimal.class),
-            @Arg(column = "available_stock", javaType = Long.class),
-            @Arg(column = "status", javaType = Integer.class)
-    })
+    /**
+     * 结果映射说明：
+     * SELECT 的列顺序必须与 ProductListItem 的 record 组件顺序完全一致，
+     * MyBatis 按位置调用 record 的规范构造器完成映射，无需 @ConstructorArgs。
+     */
     @Select("""
             SELECT
                 p.id,
@@ -47,17 +40,9 @@ public interface ProductSpuMapper extends BaseMapper<ProductSpu> {
             """)
     List<ProductListItem> findListByStoreId(@Param("storeId") Long storeId);
 
-    @ConstructorArgs({
-            @Arg(column = "id", javaType = Long.class, id = true),
-            @Arg(column = "title", javaType = String.class),
-            @Arg(column = "subtitle", javaType = String.class),
-            @Arg(column = "main_image_url", javaType = String.class),
-            @Arg(column = "min_price", javaType = BigDecimal.class),
-            @Arg(column = "store_name", javaType = String.class),
-            @Arg(column = "category_name", javaType = String.class),
-            @Arg(column = "available_stock", javaType = Long.class),
-            @Arg(column = "sold_count", javaType = Long.class)
-    })
+    /**
+     * 结果映射说明：列顺序需与 ProductCardView 的 record 组件顺序一致。
+     */
     @Select("""
             <script>
             SELECT

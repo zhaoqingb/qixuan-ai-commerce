@@ -26,6 +26,12 @@ public class CategoryService {
         this.categoryMapper = categoryMapper;
     }
 
+    public List<Category> listRootCategories() {
+        LambdaQueryWrapper<Category> wrapper = new LambdaQueryWrapper<>();
+        wrapper.isNull(Category::getParentId).eq(Category::getEnabled, 1).orderByAsc(Category::getSortOrder);
+        return categoryMapper.selectList(wrapper);
+    }
+
     public List<Category> listCategories() {
         LambdaQueryWrapper<Category> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Category::getEnabled, 1).orderByAsc(Category::getSortOrder);
