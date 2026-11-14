@@ -167,10 +167,6 @@ public class CategoryService {
                     HttpStatus.CONFLICT, "该分类存在子分类，不能删除");
         }
 
-        // TODO 第 7 关：在这里补「该分类下有商品」的检查
-        // 要点① 商品在 product_spu 表，用 category_id 关联
-        // 要点② CategoryService 目前只注入了 CategoryMapper，需要额外注入 ProductSpuMapper
-        // 要点③ 有商品时不能删（状态冲突 → 409）
         Long productCount = productSpuMapper.selectCount(
                 new LambdaQueryWrapper<ProductSpu>()
                         .eq(ProductSpu::getCategoryId, id));

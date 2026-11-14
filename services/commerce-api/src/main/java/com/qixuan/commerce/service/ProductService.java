@@ -100,52 +100,35 @@ public class ProductService {
                                         HttpStatus.BAD_REQUEST, "商品分类不存在或已禁用");
                 }
 
-                // 3.创建SPU
                 ProductSpu spu = new ProductSpu();
-
                 spu.setStoreId(request.storeId());
                 spu.setCategoryId(request.categoryId());
                 spu.setTitle(request.name().trim());
                 spu.setDescription(request.description());
-
                 spu.setStatus(BizStatus.SPU_DRAFT);
                 productSpuMapper.insert(spu);
-
-                // MySQL自增ID回填至实体
                 Long spuId = spu.getId();
                 List<Long> skuIds = new ArrayList<>();
-
-                // 4.创建多个SKU和库存
                 for (ProductCreateRequest.SkuItem item : request.skus()) {
                         ProductSku sku = new ProductSku();
-
                         sku.setSpuId(spuId);
                         sku.setSkuCode(item.skuCode().trim());
-
-                        // 将规格Map转换为JSON字符串
-                        sku.setSpecJson(
-                                        jsonMapper.writeValueAsString(item.specs()));
-
+                        sku.setSpecJson(jsonMapper.writeValueAsString(item.specs()));
                         sku.setSalePrice(item.price());
                         sku.setStatus(BizStatus.SKU_ACTIVE);
-
                         productSkuMapper.insert(sku);
 
                         Long skuId = sku.getId();
                         skuIds.add(skuId);
 
-                        // 5.初始化SKU库存
-                        SkuInventory inventory = new SkuInventory();
-
-                        inventory.setSkuId(skuId);
-                        inventory.setAvailableQty(item.stock());
-                        inventory.setLockedQty(0);
-                        inventory.setVersion(0);
-
-                        skuInventoryMapper.insert(inventory);
+                        // 5.创建SKU库存
+                        SkuInventory skuInventory = new SkuInventory();
+                        skuInventory.setSkuId(skuId);
+                        skuInventory.setAvailableQty(item.stock());
+                        skuInventory.setLockedQty(0);
+                        skuInventory.setVersion(0);
+                        skuInventoryMapper.insert(skuInventory);
                 }
-
-                // 全部成功后返回新增ID
                 return new ProductCreateResponse(spuId, skuIds);
         }
 
@@ -185,18 +168,39 @@ public class ProductService {
                                                 HttpStatus.BAD_REQUEST,
                                                 "商品分类不存在或已禁用");
                         }
-                        Long skuCount = productSkuMapper.selectCount(
-                                        new LambdaQueryWrapper<ProductSku>().eq(ProductSku::getSpuId, productId).eq(
-                                                        ProductSku::getStatus,
-                                                        BizStatus.SKU_ACTIVE));
-
-                        if (skuCount == 0) {
+                        List<ProductSku> skus = productSkuMapper.selectList(
+                                        new LambdaQueryWrapper<ProductSku>().eq(ProductSku::getSpuId, productId)
+                                                        .eq(ProductSku::getStatus, BizStatus.SKU_ACTIVE));
+                        if (skus.isEmpty()) {
                                 throw new ResponseStatusException(
                                                 HttpStatus.BAD_REQUEST,
                                                 "商品没有可用SKU,无法上架");
                         }
-                }
+                        // 提取这些 SKU 的 id
+                        List<Long> skuIds = new ArrayList<>();
+                        for (ProductSku sku : skus) {
+                                skuIds.add(sku.getId());
+                        }
 
+                        // 汇总可售库存
+                        long totalAvailable = 0;
+                        if (!skuIds.isEmpty()) {
+                                List<SkuInventory> inventories = skuInventoryMapper
+                                                .selectList(new LambdaQueryWrapper<SkuInventory>()
+                                                                .in(SkuInventory::getSkuId, skuIds));
+                                for (SkuInventory inventory : inventories) {
+                                        Integer availableQty = inventory.getAvailableQty();
+                                        if (availableQty != null) {
+                                                totalAvailable += availableQty;
+                                        }
+                                }
+                        }
+                        if (totalAvailable <= 0) {
+                                throw new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST,
+                                                "商品没有可用库存,无法上架");
+                        }
+                }
                 // 5.只更新商品状态与更新时间
                 String targetStatus = request.status() == 1
                                 ? BizStatus.SPU_ON_SALE
