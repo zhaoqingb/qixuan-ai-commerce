@@ -40,9 +40,6 @@ public interface ProductSpuMapper extends BaseMapper<ProductSpu> {
             """)
     List<ProductListItem> findListByStoreId(@Param("storeId") Long storeId);
 
-    /**
-     * 结果映射说明：列顺序需与 ProductCardView 的 record 组件顺序一致。
-     */
     @Select("""
             <script>
             SELECT
@@ -58,15 +55,13 @@ public interface ProductSpuMapper extends BaseMapper<ProductSpu> {
             FROM product_spu p
             JOIN store st ON st.id = p.store_id
             JOIN category c ON c.id = p.category_id
-            LEFT JOIN product_sku sku
-                ON sku.spu_id = p.id AND sku.status = 'ACTIVE'
+            LEFT JOIN product_sku sku ON sku.spu_id = p.id AND sku.status = 'ACTIVE'
             LEFT JOIN sku_inventory inv ON inv.sku_id = sku.id
-            WHERE p.status = 'ON_SALE'
-              AND st.status = 'ACTIVE'
-            <if test="categoryId != null">
+            WHERE p.status = 'ON_SALE' AND st.status = 'ACTIVE'
+            <if test="categoryId!=null">
               AND p.category_id = #{categoryId}
             </if>
-            <if test="keyword != null and keyword != ''">
+            <if test="keyword!=null and keyword!=''">
               AND p.title LIKE CONCAT('%', #{keyword}, '%')
             </if>
             GROUP BY p.id, p.title, p.subtitle, p.main_image_url, st.store_name, c.name
