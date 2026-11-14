@@ -5,7 +5,9 @@ import com.qixuan.commerce.dto.CategoryCreateRequest;
 import com.qixuan.commerce.dto.CategoryTreeNode;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.qixuan.commerce.entity.Category;
+import com.qixuan.commerce.entity.ProductSpu;
 import com.qixuan.commerce.mapper.CategoryMapper;
+import com.qixuan.commerce.mapper.ProductSpuMapper;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,9 +23,11 @@ import java.util.ArrayList;
 public class CategoryService {
 
     private final CategoryMapper categoryMapper;
+    private final ProductSpuMapper productSpuMapper;
 
-    public CategoryService(CategoryMapper categoryMapper) {
+    public CategoryService(CategoryMapper categoryMapper, ProductSpuMapper productSpuMapper) {
         this.categoryMapper = categoryMapper;
+        this.productSpuMapper = productSpuMapper;
     }
 
     public List<Category> listRootCategories() {
@@ -40,20 +44,28 @@ public class CategoryService {
 
     public Category createCategory(CategoryCreateRequest request) {
 
-        // 检查父分类是否存在
-        if (request.getParentId() != null) {
+        String name = request.getName().trim();
+        LambdaQueryWrapper<Category> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Category::getName, name);
+        if (request.getParentId() == null) {
+            wrapper.isNull(Category::getParentId);
+        } else {
             Category parent = categoryMapper.selectById(request.getParentId());
-
             if (parent == null) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "父分类不存在");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "父分类不存在");
             }
+            wrapper.eq(Category::getParentId, request.getParentId());
+        }
+        Long count = categoryMapper.selectCount(wrapper);
+        if (count > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "同级分类已存在");
         }
 
         // 构建数据库实体
         Category category = new Category();
 
-        category.setName(request.getName());
+        category.setName(name);
         category.setParentId(request.getParentId());
         category.setSortOrder(
                 request.getSortOrder() == null ? 0 : request.getSortOrder());
@@ -100,6 +112,19 @@ public class CategoryService {
             parentId = parent.getParentId();
         }
 
+        String newName = request.getName().trim();
+        LambdaQueryWrapper<Category> checkWrapper = new LambdaQueryWrapper<>();
+        checkWrapper.ne(Category::getId, id).eq(Category::getName, newName);
+        if (request.getParentId() == null) {
+            checkWrapper.isNull(Category::getParentId);
+        } else {
+            checkWrapper.eq(Category::getParentId, request.getParentId());
+        }
+        Long count = categoryMapper.selectCount(checkWrapper);
+        if (count > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "同级分类已存在");
+        }
         // 3. 使用 LambdaUpdateWrapper 显式更新字段
         LambdaUpdateWrapper<Category> wrapper = new LambdaUpdateWrapper<>();
 
@@ -140,6 +165,19 @@ public class CategoryService {
         if (childCount > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT, "该分类存在子分类，不能删除");
+        }
+
+        // TODO 第 7 关：在这里补「该分类下有商品」的检查
+        // 要点① 商品在 product_spu 表，用 category_id 关联
+        // 要点② CategoryService 目前只注入了 CategoryMapper，需要额外注入 ProductSpuMapper
+        // 要点③ 有商品时不能删（状态冲突 → 409）
+        Long productCount = productSpuMapper.selectCount(
+                new LambdaQueryWrapper<ProductSpu>()
+                        .eq(ProductSpu::getCategoryId, id));
+
+        if (productCount > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "该分类下有商品，不能删除");
         }
 
         categoryMapper.deleteById(id);
