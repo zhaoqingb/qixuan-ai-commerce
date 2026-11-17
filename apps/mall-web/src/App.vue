@@ -2,11 +2,14 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import ServiceChat from '@/components/ServiceChat.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
+const authStore = useAuthStore()
 
 const keyword = ref(typeof route.query.keyword === 'string' ? route.query.keyword : '')
 
@@ -39,8 +42,17 @@ function clearKeyword() {
 }
 
 onMounted(() => {
-  cartStore.refresh().catch(() => undefined)
+  // 没登录就不要再请求购物车，否则 401 会被拦截器踢去登录页
+  if (authStore.isLoggedIn) {
+    cartStore.refresh().catch(() => undefined)
+  }
 })
+
+function logout() {
+  authStore.logout()
+  cartStore.items.splice(0)
+  router.push('/')
+}
 </script>
 
 <template>
@@ -104,6 +116,13 @@ onMounted(() => {
             {{ cartStore.totalQuantity > 99 ? '99+' : cartStore.totalQuantity }}
           </span>
         </RouterLink>
+
+        <div v-if="authStore.isLoggedIn" class="user">
+          <span class="user__avatar">{{ authStore.username.slice(0, 1).toUpperCase() }}</span>
+          <span class="user__name">{{ authStore.username }}</span>
+          <button type="button" class="user__logout" @click="logout">退出</button>
+        </div>
+        <RouterLink v-else to="/login" class="action action--login">登录 / 注册</RouterLink>
       </nav>
     </div>
   </header>
@@ -128,6 +147,8 @@ onMounted(() => {
       </div>
     </div>
   </footer>
+
+  <ServiceChat />
 </template>
 
 <style scoped>
@@ -330,6 +351,64 @@ onMounted(() => {
   line-height: 18px;
   text-align: center;
   font-weight: 600;
+}
+
+/* ---------- 用户区 ---------- */
+.user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 6px;
+  padding: 5px 6px 5px 5px;
+  border-radius: 22px;
+  background: #f4f6fa;
+}
+
+.user__avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.user__name {
+  max-width: 88px;
+  font-size: 13px;
+  color: var(--qx-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user__logout {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--qx-ink-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.user__logout:hover {
+  color: var(--qx-brand-dark);
+}
+
+.action--login {
+  border: 1.5px solid var(--qx-brand);
+  color: var(--qx-brand-dark);
+  font-weight: 600;
+}
+
+.action--login:hover {
+  background: var(--qx-brand-soft);
+  color: var(--qx-brand-dark);
 }
 
 .main {

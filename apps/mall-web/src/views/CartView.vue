@@ -121,9 +121,26 @@ onMounted(() => {
 
 <template>
   <div class="cart qx-container qx-page">
-    <header class="cart__head">
-      <h1 class="cart__title">我的购物车</h1>
-      <span class="cart__count">{{ items.length }} 种商品 / {{ cartStore.totalQuantity }} 件</span>
+    <header class="qx-page-head">
+      <div>
+        <h1>我的购物车</h1>
+        <p class="qx-page-head__sub">
+          {{ items.length }} 种商品 · 共 {{ cartStore.totalQuantity }} 件
+        </p>
+      </div>
+      <RouterLink to="/" class="qx-page-head__link">
+        继续购物
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M9 6l6 6-6 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </RouterLink>
     </header>
 
     <el-skeleton v-if="cartStore.loading && items.length === 0" :rows="6" animated />
@@ -243,24 +260,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.cart__head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.cart__title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.cart__count {
-  font-size: 13px;
-  color: var(--qx-ink-3);
-}
-
 .list {
   overflow: hidden;
 }
@@ -452,13 +451,13 @@ onMounted(() => {
 
 .bar__btn {
   width: 140px;
-  height: 44px;
+  height: var(--qx-btn-height);
   border: none;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  border-radius: var(--qx-btn-radius);
+  background: var(--qx-grad);
   font-size: 15px;
   font-weight: 600;
-  box-shadow: 0 10px 20px rgba(255, 90, 31, 0.24);
+  box-shadow: var(--qx-grad-shadow);
 }
 
 @media (max-width: 900px) {

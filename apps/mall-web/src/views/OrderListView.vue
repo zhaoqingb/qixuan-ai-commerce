@@ -184,14 +184,14 @@ onMounted(loadOrders)
 
 <template>
   <div class="orders qx-container qx-page">
-    <header class="head">
+    <header class="qx-page-head">
       <div>
-        <h1 class="head__title">我的订单</h1>
-        <p class="head__sub">
+        <h1>我的订单</h1>
+        <p class="qx-page-head__sub">
           共 {{ orders.length }} 笔订单 · {{ totalItems }} 件商品
         </p>
       </div>
-      <RouterLink to="/" class="head__link">
+      <RouterLink to="/" class="qx-page-head__link">
         继续购物
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -335,44 +335,6 @@ onMounted(loadOrders)
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.head__title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.head__sub {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--qx-ink-3);
-}
-
-.head__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 13px;
-  color: var(--qx-ink-2);
-  transition: color 0.18s ease;
-}
-
-.head__link svg {
-  width: 16px;
-  height: 16px;
-}
-
-.head__link:hover {
-  color: var(--qx-brand);
-}
-
 /* ---------- 状态筛选 ---------- */
 .tabs {
   display: flex;
@@ -408,7 +370,7 @@ onMounted(loadOrders)
 
 .tab.is-active {
   border-color: transparent;
-  background: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  background: var(--qx-grad);
   color: #fff;
   font-weight: 600;
   box-shadow: 0 6px 16px rgba(255, 90, 31, 0.22);

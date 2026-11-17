@@ -236,10 +236,10 @@ onMounted(loadDetail)
 
 <template>
   <div class="detail qx-container qx-page">
-    <nav class="crumb">
-      <RouterLink to="/orders" class="crumb__link">我的订单</RouterLink>
-      <span class="crumb__sep">/</span>
-      <span class="crumb__current">订单详情</span>
+    <nav class="qx-crumb">
+      <RouterLink to="/orders">我的订单</RouterLink>
+      <span class="qx-crumb__sep">/</span>
+      <span class="qx-crumb__current">订单详情</span>
     </nav>
 
     <el-skeleton v-if="loading" :rows="10" animated />
@@ -438,27 +438,6 @@ onMounted(loadDetail)
 </template>
 
 <style scoped>
-.crumb {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 14px;
-  font-size: 13px;
-  color: var(--qx-ink-3);
-}
-
-.crumb__link:hover {
-  color: var(--qx-brand);
-}
-
-.crumb__sep {
-  color: var(--qx-line);
-}
-
-.crumb__current {
-  color: var(--qx-ink-2);
-}
-
 /* ---------- 状态横幅 ---------- */
 .banner {
   padding: 22px 26px;
@@ -644,8 +623,9 @@ onMounted(loadDetail)
 }
 
 .block__title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 .block__sub {
@@ -859,7 +839,7 @@ onMounted(loadDetail)
 
 .side__btn.el-button--primary {
   border: none;
-  background: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  background: var(--qx-grad);
   box-shadow: 0 8px 18px rgba(255, 90, 31, 0.22);
 }
 

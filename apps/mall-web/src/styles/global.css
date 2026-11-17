@@ -13,6 +13,13 @@
   --qx-shadow: 0 6px 24px rgba(31, 36, 48, 0.06);
   --qx-shadow-lg: 0 16px 40px rgba(31, 36, 48, 0.12);
 
+  /* 品牌渐变与主按钮规格：全站唯一来源，改这里就能全站生效 */
+  --qx-grad: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  --qx-bar-grad: linear-gradient(180deg, #ff8a4c, #ff5a1f);
+  --qx-grad-shadow: 0 10px 22px rgba(255, 90, 31, 0.26);
+  --qx-btn-height: 46px;
+  --qx-btn-radius: 23px;
+
   /* Element Plus 主色跟随品牌色 */
   --el-color-primary: #ff6b35;
   --el-color-primary-light-3: #ff8f63;
@@ -101,6 +108,161 @@ p {
   font-weight: 600;
   letter-spacing: 0.2px;
 }
+
+/* ==========================================================
+   页面骨架：所有内页共用，保证和首页楼层的视觉语言一致
+   —— 标题左侧的品牌竖条是全局统一的视觉锚点
+   ========================================================== */
+
+.qx-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.qx-page-head h1 {
+  position: relative;
+  padding-left: 14px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1.35;
+  color: var(--qx-ink);
+}
+
+.qx-page-head h1::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 21px;
+  border-radius: 3px;
+  background: var(--qx-bar-grad);
+}
+
+.qx-page-head__sub {
+  margin-top: 6px;
+  padding-left: 14px;
+  font-size: 13px;
+  color: var(--qx-ink-3);
+}
+
+.qx-page-head__extra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qx-page-head__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--qx-ink-2);
+  transition: color 0.18s ease;
+}
+
+.qx-page-head__link svg {
+  width: 16px;
+  height: 16px;
+}
+
+.qx-page-head__link:hover {
+  color: var(--qx-brand);
+}
+
+/* 卡片内的区块小标题（和页面标题同一套竖条，只是更小） */
+.qx-block-title {
+  position: relative;
+  padding-left: 11px;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--qx-ink);
+}
+
+.qx-block-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--qx-bar-grad);
+}
+
+/* 面包屑：商品详情、订单详情共用 */
+.qx-crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--qx-ink-3);
+  overflow: hidden;
+}
+
+.qx-crumb a {
+  flex-shrink: 0;
+  color: var(--qx-ink-2);
+  transition: color 0.18s ease;
+}
+
+.qx-crumb a:hover {
+  color: var(--qx-brand);
+}
+
+.qx-crumb__sep {
+  color: #cdd4e0;
+}
+
+.qx-crumb__current {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 主按钮：全站「去结算 / 提交订单 / 加入购物车」统一规格 */
+.qx-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--qx-btn-height);
+  padding: 0 26px;
+  border: none;
+  border-radius: var(--qx-btn-radius);
+  background: var(--qx-grad);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: var(--qx-grad-shadow);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+
+.qx-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(255, 90, 31, 0.34);
+}
+
+.qx-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 
 .qx-ellipsis-2 {
   display: -webkit-box;

@@ -106,11 +106,13 @@ onMounted(load)
 
 <template>
   <div class="checkout qx-container qx-page">
-    <header class="checkout__head">
-      <h1>确认订单</h1>
-      <span v-if="preview" class="checkout__meta">
-        {{ preview.storeGroups.length }} 个店铺 · 共 {{ totalQuantity }} 件商品
-      </span>
+    <header class="qx-page-head">
+      <div>
+        <h1>确认订单</h1>
+        <p v-if="preview" class="qx-page-head__sub">
+          {{ preview.storeGroups.length }} 个店铺 · 共 {{ totalQuantity }} 件商品
+        </p>
+      </div>
     </header>
 
     <el-skeleton v-if="loading" :rows="10" animated />
@@ -122,7 +124,7 @@ onMounted(load)
     <div v-else-if="preview" class="layout">
       <div class="main">
         <section class="block qx-card">
-          <h2 class="block__title">收货地址</h2>
+          <h2 class="qx-block-title">收货地址</h2>
 
           <div v-if="addresses.length === 0" class="empty-address">
             还没有收货地址，请先在数据库或后续的地址管理页面添加。
@@ -183,7 +185,7 @@ onMounted(load)
 
       <aside class="aside">
         <div class="summary qx-card">
-          <h2 class="block__title">金额明细</h2>
+          <h2 class="qx-block-title">金额明细</h2>
 
           <div class="summary__row">
             <span>商品金额</span>
@@ -221,24 +223,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.checkout__head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.checkout__head h1 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.checkout__meta {
-  font-size: 13px;
-  color: var(--qx-ink-3);
-}
-
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
@@ -255,12 +239,6 @@ onMounted(load)
 
 .block {
   padding: 20px 22px;
-}
-
-.block__title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 14px;
 }
 
 /* ---------- 地址 ---------- */
@@ -486,13 +464,13 @@ onMounted(load)
 
 .summary__btn {
   width: 100%;
-  height: 46px;
+  height: var(--qx-btn-height);
   border: none;
-  border-radius: 23px;
-  background: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  border-radius: var(--qx-btn-radius);
+  background: var(--qx-grad);
   font-size: 15px;
   font-weight: 600;
-  box-shadow: 0 10px 22px rgba(255, 90, 31, 0.26);
+  box-shadow: var(--qx-grad-shadow);
 }
 
 .summary__back {

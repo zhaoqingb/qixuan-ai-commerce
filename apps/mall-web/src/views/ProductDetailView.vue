@@ -142,17 +142,17 @@ watch(
 
 <template>
   <div class="detail qx-container qx-page">
-    <div class="crumb">
-      <RouterLink to="/" class="crumb__back">
+    <nav class="qx-crumb">
+      <RouterLink to="/">
         <span aria-hidden="true">←</span> 返回商品列表
       </RouterLink>
       <template v-if="detail">
-        <span class="crumb__sep">/</span>
-        <span class="crumb__store">{{ detail.storeName }}</span>
-        <span class="crumb__sep">/</span>
-        <span class="crumb__current">{{ detail.title }}</span>
+        <span class="qx-crumb__sep">/</span>
+        <span class="qx-crumb__current">{{ detail.storeName }}</span>
+        <span class="qx-crumb__sep">/</span>
+        <span class="qx-crumb__current">{{ detail.title }}</span>
       </template>
-    </div>
+    </nav>
 
     <el-skeleton v-if="loading" :rows="8" animated />
 
@@ -248,41 +248,6 @@ watch(
 </template>
 
 <style scoped>
-.crumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: var(--qx-ink-3);
-  overflow: hidden;
-}
-
-.crumb__back {
-  flex-shrink: 0;
-  color: var(--qx-ink-2);
-  transition: color 0.18s ease;
-}
-
-.crumb__back:hover {
-  color: var(--qx-brand);
-}
-
-.crumb__sep {
-  color: #cdd4e0;
-}
-
-.crumb__store,
-.crumb__current {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.crumb__current {
-  min-width: 0;
-}
-
 .panel {
   display: grid;
   grid-template-columns: 480px minmax(0, 1fr);
@@ -469,13 +434,13 @@ watch(
 
 .btn-cart {
   min-width: 168px;
-  height: 46px;
+  height: var(--qx-btn-height);
   border: none;
-  border-radius: 23px;
-  background: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  border-radius: var(--qx-btn-radius);
+  background: var(--qx-grad);
   font-size: 15px;
   font-weight: 600;
-  box-shadow: 0 10px 22px rgba(255, 90, 31, 0.26);
+  box-shadow: var(--qx-grad-shadow);
 }
 
 .desc {

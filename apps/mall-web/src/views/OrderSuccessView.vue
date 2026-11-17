@@ -178,7 +178,7 @@ const storeCount = computed(() => Number(route.query.stores ?? 0))
   height: 44px;
   border: none;
   border-radius: 22px;
-  background: linear-gradient(135deg, #ff8a4c, #ff5a1f);
+  background: var(--qx-grad);
   font-size: 15px;
   font-weight: 600;
   box-shadow: 0 10px 22px rgba(255, 90, 31, 0.24);
