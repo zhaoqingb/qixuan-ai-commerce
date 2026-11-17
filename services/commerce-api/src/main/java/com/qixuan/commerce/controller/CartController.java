@@ -20,27 +20,27 @@ public class CartController {
     }
 
     @GetMapping
-    public List<CartItemView> list(@RequestParam Long userId) {
+    public List<CartItemView> list(@RequestAttribute("userId") Long userId) {
         return cartService.list(userId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public void add(@Valid @RequestBody AddCartRequest request) {
-        cartService.add(request);
+    public void add(@RequestAttribute("userId") Long userId, @Valid @RequestBody AddCartRequest request) {
+        cartService.add(userId, request);
     }
 
     @PatchMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void update(@PathVariable Long id,
+    public void update(@RequestAttribute("userId") Long userId, @PathVariable Long id,
             @Valid @RequestBody CartItemUpdateRequest request) {
-        cartService.update(id, request);
+        cartService.update(userId, id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id, @RequestParam Long userId) {
-        cartService.delete(id, userId);
+    public void delete(@RequestAttribute("userId") Long userId, @PathVariable Long id) {
+        cartService.delete(userId, id);
     }
 
 }

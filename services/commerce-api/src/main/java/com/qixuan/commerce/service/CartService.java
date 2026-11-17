@@ -36,33 +36,29 @@ public class CartService {
     }
 
     @Transactional
-    public void add(AddCartRequest request) {
+    public void add(Long userId, AddCartRequest request) {
+
         ProductSku sku = productSkuMapper.selectById(request.skuId());
+
         if (sku == null || !"ACTIVE".equals(sku.getStatus())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "商品不存在或已下架");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "当前商品不存在或已下架");
         }
 
         SkuInventory inv = skuInventoryMapper.selectById(request.skuId());
         int available = inv == null ? 0 : inv.getAvailableQty();
         if (available < request.quantity()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "库存不足");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "库存不足");
         }
-
-        CartItem existing = cartItemMapper.selectOne(
-                new LambdaQueryWrapper<CartItem>()
-                        .eq(CartItem::getUserId, request.userId())
-                        .eq(CartItem::getSkuId, request.skuId()));
+        CartItem existing = cartItemMapper.selectOne(new LambdaQueryWrapper<CartItem>()
+                .eq(CartItem::getUserId, userId).eq(CartItem::getSkuId, request.skuId()));
 
         if (existing == null) {
             CartItem item = new CartItem();
-            item.setUserId(request.userId());
+            item.setUserId(userId);
             item.setSkuId(request.skuId());
             item.setQuantity(request.quantity());
             item.setSelected(1);
             cartItemMapper.insert(item);
-
         } else {
             int newQty = existing.getQuantity() + request.quantity();
             if (newQty > available) {
@@ -72,19 +68,18 @@ public class CartService {
             existing.setQuantity(newQty);
             cartItemMapper.updateById(existing);
         }
+
     }
 
     @Transactional
-    public void update(Long id, CartItemUpdateRequest request) {
+    public void update(Long userId, Long id, CartItemUpdateRequest request) {
         if (request.quantity() == null && request.selected() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "quantity 与 selected 至少提供一个");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "quantity 与 selected 至少提供一个");
         }
-
         CartItem item = cartItemMapper.selectOne(
                 new LambdaQueryWrapper<CartItem>()
                         .eq(CartItem::getId, id)
-                        .eq(CartItem::getUserId, request.userId()));
+                        .eq(CartItem::getUserId, userId));
         if (item == null) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND, "购物车条目不存在");
@@ -93,21 +88,19 @@ public class CartService {
         if (request.quantity() != null) {
             SkuInventory inv = skuInventoryMapper.selectById(item.getSkuId());
             int available = inv == null ? 0 : inv.getAvailableQty();
-            if (request.quantity() > available) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "库存不足");
+            if (available < request.quantity()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "库存不足");
             }
             item.setQuantity(request.quantity());
         }
-
         if (request.selected() != null) {
             item.setSelected(request.selected());
         }
-
         cartItemMapper.updateById(item);
+
     }
 
-    public void delete(Long id, Long userId) {
+    public void delete(Long userId, Long id) {
         int rows = cartItemMapper.delete(
                 new LambdaQueryWrapper<CartItem>()
                         .eq(CartItem::getId, id)

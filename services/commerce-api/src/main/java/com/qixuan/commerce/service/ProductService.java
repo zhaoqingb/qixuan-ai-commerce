@@ -46,6 +46,7 @@ public class ProductService {
         private final SkuInventoryMapper skuInventoryMapper;
         private final CategoryMapper categoryMapper;
         private final JsonMapper jsonMapper;
+        private final ProductCacheService productCacheService;
 
         public ProductService(
                         ProductSpuMapper productSpuMapper,
@@ -53,7 +54,8 @@ public class ProductService {
                         SkuInventoryMapper skuInventoryMapper,
                         ProductSkuMapper productSkuMapper,
                         CategoryMapper categoryMapper,
-                        JsonMapper jsonMapper) {
+                        JsonMapper jsonMapper,
+                        ProductCacheService productCacheService) {
 
                 this.productSpuMapper = productSpuMapper;
                 this.storeMapper = storeMapper;
@@ -61,9 +63,18 @@ public class ProductService {
                 this.categoryMapper = categoryMapper;
                 this.jsonMapper = jsonMapper;
                 this.skuInventoryMapper = skuInventoryMapper;
+                this.productCacheService = productCacheService;
         }
 
-        public List<ProductListItem> listProducts(Long storeId) {
+        private Store requireOwnedStore(Long userId, Long storeId) {
+                Store store = storeMapper.selectById(storeId);
+                if (store == null || !userId.equals(store.getOwnerUserId())) {
+                        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "店铺不存在");
+                }
+                return store;
+        }
+
+        public List<ProductListItem> listProducts(Long userId, Long storeId) {
                 // 1.校验店铺ID
                 if (storeId == null || storeId <= 0) {
                         throw new ResponseStatusException(
@@ -71,26 +82,22 @@ public class ProductService {
                                         "店铺ID必须为正整数");
                 }
                 // 2.查询店铺是否存在
-                if (storeMapper.selectById(storeId) == null) {
-                        throw new ResponseStatusException(
-                                        HttpStatus.BAD_REQUEST,
-                                        "店铺不存在");
-                }
+                requireOwnedStore(userId, storeId);
                 // 3.查询该店铺的商品
                 return productSpuMapper.findListByStoreId(storeId);
         }
 
         @Transactional
         public ProductCreateResponse createProduct(
+                        Long userId,
                         ProductCreateRequest request) {
                 // 1.检查店铺
-                Store store = storeMapper.selectById(
-                                request.storeId());
+                Store store = requireOwnedStore(userId, request.storeId());
 
-                if (store == null || !BizStatus.STORE_ACTIVE.equals(store.getStatus())) {
+                if (!BizStatus.STORE_ACTIVE.equals(store.getStatus())) {
                         throw new ResponseStatusException(
                                         HttpStatus.BAD_REQUEST,
-                                        "店铺不存在或已停用");
+                                        "店铺已停用");
                 }
                 // 2.检查商品分类
                 Category category = categoryMapper.selectById(
@@ -129,11 +136,16 @@ public class ProductService {
                         skuInventory.setVersion(0);
                         skuInventoryMapper.insert(skuInventory);
                 }
+
+                // 草稿不进列表，但保守起见还是失效一次：万一改了上下架规则不会漏
+                productCacheService.evictAll();
+
                 return new ProductCreateResponse(spuId, skuIds);
         }
 
         @Transactional
         public void updateProductStatus(
+                        Long userId,
                         Long productId,
                         ProductStatusRequest request) {
                 // 1.检查商品ID
@@ -152,11 +164,11 @@ public class ProductService {
                 }
 
                 // 3.检查店铺状态
-                Store store = storeMapper.selectById(request.storeId());
-                if (store == null || !BizStatus.STORE_ACTIVE.equals(store.getStatus())) {
+                Store store = requireOwnedStore(userId, request.storeId());
+                if (!BizStatus.STORE_ACTIVE.equals(store.getStatus())) {
                         throw new ResponseStatusException(
                                         HttpStatus.BAD_REQUEST,
-                                        "店铺不存在或已停用");
+                                        "店铺已停用");
                 }
 
                 // 4.上架时额外检查分类与SKU
@@ -219,11 +231,21 @@ public class ProductService {
                                         HttpStatus.CONFLICT,
                                         "商品状态更新失败，请重试");
                 }
+
+                // 上下架直接改变列表可见性，必须立刻让缓存失效
+                productCacheService.evictAll();
         }
 
         public List<ProductCardView> listOnSale(Long categoryId, String keyword) {
                 String kw = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
-                return productSpuMapper.findOnSale(categoryId, kw);
+
+                // 搜索是长尾请求：关键词组合无限，缓存命中率低还会撑爆 key 空间，直接查库
+                if (kw != null) {
+                        return productSpuMapper.findOnSale(categoryId, kw);
+                }
+
+                return productCacheService.getOrLoad(categoryId,
+                                () -> productSpuMapper.findOnSale(categoryId, null));
         }
 
         public List<ProductSpu> listProducts(Long categoryId, String keyword) {
@@ -236,7 +258,8 @@ public class ProductService {
                 return productSpuMapper.selectList(wrapper);
         }
 
-        public ProductDetailResponse getProductDetail(Long storeId, Long id) {
+        public ProductDetailResponse getProductDetail(Long storeId, Long userId, Long id) {
+                requireOwnedStore(userId, storeId);
                 ProductSpu spu = productSpuMapper.selectById(id);
                 if (spu == null || !storeId.equals(spu.getStoreId())) {
                         throw new ResponseStatusException(

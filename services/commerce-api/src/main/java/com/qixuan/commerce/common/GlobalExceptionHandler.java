@@ -144,6 +144,20 @@ public class GlobalExceptionHandler {
                                                 request));
         }
 
+        @ExceptionHandler(IllegalArgumentException.class)
+        public ResponseEntity<ApiError> handleIllegalArgument(
+                        IllegalArgumentException ex,
+                        HttpServletRequest request) {
+
+                String message = ex.getMessage() == null ? "请求参数不合法" : ex.getMessage();
+                return ResponseEntity
+                                .badRequest()
+                                .body(error(
+                                                "INVALID_ARGUMENT",
+                                                message,
+                                                request));
+        }
+
         // 处理未预期的服务器异常
         @ExceptionHandler(Exception.class)
         public ResponseEntity<ApiError> handleUnexpected(

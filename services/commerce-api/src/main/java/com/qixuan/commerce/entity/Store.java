@@ -6,6 +6,15 @@ import com.baomidou.mybatisplus.annotation.TableName;
 public class Store extends BaseEntity {
     private String storeName;
     private String status;
+    private Long ownerUserId;
+
+    public Long getOwnerUserId() {
+        return ownerUserId;
+    }
+
+    public void setOwnerUserId(Long ownerUserId) {
+        this.ownerUserId = ownerUserId;
+    }
 
     public String getStoreName() {
         return storeName;

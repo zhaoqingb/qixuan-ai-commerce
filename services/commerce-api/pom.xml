@@ -93,6 +93,18 @@
     <artifactId>flyway-mysql</artifactId>
 </dependency>
 
+        <!-- Redis：商品缓存 + 后续秒杀预扣库存 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- 8. 密码哈希：只引入 BCrypt 工具类，不引入完整的 Security 过滤器链 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
     </dependencies>
 
     <!-- Maven 构建插件 -->

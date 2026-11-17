@@ -22,18 +22,20 @@ public class CheckoutController {
     }
 
     @GetMapping("/preview")
-    public CheckoutPreviewResponse preview(@RequestParam Long userId) {
+    public CheckoutPreviewResponse preview(@RequestAttribute("userId") Long userId) {
         return checkoutService.preview(userId);
     }
 
     @GetMapping("/addresses")
-    public List<UserAddress> addresses(@RequestParam Long userId) {
+    public List<UserAddress> addresses(@RequestAttribute("userId") Long userId) {
         return checkoutService.listAddresses(userId);
     }
 
     @PostMapping("/submit")
     @ResponseStatus(HttpStatus.CREATED)
-    public SubmitOrderResponse submit(@Valid @RequestBody SubmitOrderRequest request) {
-        return checkoutService.submit(request);
+    public SubmitOrderResponse submit(
+            @RequestAttribute("userId") Long userId,
+            @Valid @RequestBody SubmitOrderRequest request) {
+        return checkoutService.submit(userId, request);
     }
 }

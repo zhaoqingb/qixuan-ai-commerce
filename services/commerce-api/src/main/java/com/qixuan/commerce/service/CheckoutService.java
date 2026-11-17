@@ -92,10 +92,10 @@ public class CheckoutService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public SubmitOrderResponse submit(SubmitOrderRequest request) {
+    public SubmitOrderResponse submit(Long userId, SubmitOrderRequest request) {
         TradeOrder existing = tradeOrderMapper.selectOne(
                 new LambdaQueryWrapper<TradeOrder>()
-                        .eq(TradeOrder::getUserId, request.userId())
+                        .eq(TradeOrder::getUserId, userId)
                         .eq(TradeOrder::getClientRequestId, request.clientRequestId()));
         if (existing != null) {
             long subCount = storeOrderMapper.selectCount(
@@ -114,12 +114,12 @@ public class CheckoutService {
         UserAddress address = userAddressMapper.selectOne(
                 new LambdaQueryWrapper<UserAddress>()
                         .eq(UserAddress::getId, request.addressId())
-                        .eq(UserAddress::getUserId, request.userId()));
+                        .eq(UserAddress::getUserId, userId));
         if (address == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "收货地址不存在");
         }
 
-        List<CheckoutItemView> rows = cartItemMapper.findSelectedForCheckout(request.userId());
+        List<CheckoutItemView> rows = cartItemMapper.findSelectedForCheckout(userId);
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "购物车没有已选商品");
         }
@@ -145,7 +145,7 @@ public class CheckoutService {
 
         TradeOrder trade = new TradeOrder();
         trade.setOrderNo(orderNo);
-        trade.setUserId(request.userId());
+        trade.setUserId(userId);
         trade.setClientRequestId(request.clientRequestId());
         trade.setGoodsAmount(goodsAmount);
         trade.setDiscountAmount(BigDecimal.ZERO);
@@ -173,7 +173,7 @@ public class CheckoutService {
             sub.setSubOrderNo(orderNo + "-" + subIndex);
             sub.setTradeOrderId(trade.getId());
             sub.setStoreId(group.storeId());
-            sub.setUserId(request.userId());
+            sub.setUserId(userId);
             sub.setGoodsAmount(group.goodsAmount());
             sub.setDiscountAmount(BigDecimal.ZERO);
             sub.setFreightAmount(group.freightAmount());
@@ -208,7 +208,7 @@ public class CheckoutService {
         }
 
         cartItemMapper.delete(new LambdaQueryWrapper<CartItem>()
-                .eq(CartItem::getUserId, request.userId())
+                .eq(CartItem::getUserId, userId)
                 .eq(CartItem::getSelected, 1));
 
         return new SubmitOrderResponse(
