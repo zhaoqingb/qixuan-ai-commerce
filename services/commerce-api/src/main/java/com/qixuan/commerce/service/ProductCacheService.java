@@ -51,8 +51,39 @@ public class ProductCacheService {
      * @param loader     真正的数据库查询
      */
     public List<ProductCardView> getOrLoad(Long categoryId, Supplier<List<ProductCardView>> loader) {
-        // TODO 待实现
-        return loader.get();
+
+        // 注意 try 的范围：buildKey() 内部也要访问 Redis（读版本号），
+        // 只包 get() 是不够的 —— Redis 挂掉时会在 buildKey 里抛出去。
+        String key;
+        try {
+            key = buildKey(categoryId);
+            String cached = redis.opsForValue().get(key);
+            if (cached != null) {
+                ProductCardView[] array = jsonMapper.readValue(cached, ProductCardView[].class);
+                return Arrays.asList(array);
+            }
+        } catch (Exception ex) {
+            // 读缓存这条链全挂了：直接回源。这里调 loader 是安全的，
+            // 因为还没执行过它，不会重复查库。
+            log.warn("商品缓存不可用，降级查库", ex);
+            return loader.get();
+        }
+
+        // 缓存链路正常，但没命中 —— 查库。
+        // 故意放在 try 外面：数据库异常不该被当成"缓存异常"吞掉。
+        List<ProductCardView> fresh = loader.get();
+
+        try {
+            if (fresh.isEmpty()) {
+                redis.opsForValue().set(key, "[]", EMPTY_TTL);
+            } else {
+                redis.opsForValue().set(key, jsonMapper.writeValueAsString(fresh), jitter(TTL));
+            }
+        } catch (Exception ex) {
+            log.warn("写商品缓存失败，忽略", ex);
+        }
+
+        return fresh;
     }
 
     /**

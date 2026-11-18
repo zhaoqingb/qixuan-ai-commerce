@@ -95,6 +95,9 @@ function logout() {
         <RouterLink to="/" class="action" :class="{ 'is-active': route.name === 'home' }">
           首页
         </RouterLink>
+        <RouterLink to="/seckill" class="action action--hot" :class="{ 'is-active': route.name === 'seckill' }">
+          秒杀
+        </RouterLink>
         <RouterLink to="/orders" class="action" :class="{ 'is-active': route.name === 'orders' }">
           我的订单
         </RouterLink>
@@ -335,6 +338,17 @@ function logout() {
 /* 购物车按钮右侧留出角标位置，避免角标压住文字 */
 .action--cart {
   padding-right: 28px;
+}
+
+/* 秒杀入口：全站唯一用品牌色常亮的导航项，起强调作用 */
+.action--hot {
+  color: var(--qx-brand);
+  font-weight: 600;
+}
+
+.action--hot:hover {
+  background: var(--qx-brand-soft);
+  color: var(--qx-brand-dark);
 }
 
 .badge {

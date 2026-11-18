@@ -2,8 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 
 import { fetchAddresses, fetchPreview, submitOrder } from '@/api/checkout'
+import { createAddress, fetchAddressList } from '@/api/address'
 import { CURRENT_USER_ID } from '@/config'
 import { useCartStore } from '@/stores/cart'
 import type { Address, CheckoutPreview } from '@/types/mall'
@@ -101,8 +103,69 @@ async function submit() {
   }
 }
 
-onMounted(load)
-</script>
+// ---------- 新增收货地址 ----------
+const addressDialog = ref(false)
+const addressSaving = ref(false)
+const addressFormRef = ref<FormInstance>()
+
+const addressForm = ref({
+  receiverName: '',
+  receiverPhone: '',
+  province: '',
+  city: '',
+  district: '',
+  detailAddress: '',
+  isDefault: false,
+})
+
+const addressRules = {
+  receiverName: [{ required: true, message: '请填写收货人', trigger: 'blur' }],
+  receiverPhone: [
+    { required: true, message: '请填写手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' },
+  ],
+  province: [{ required: true, message: '请填写省份', trigger: 'blur' }],
+  city: [{ required: true, message: '请填写城市', trigger: 'blur' }],
+  district: [{ required: true, message: '请填写区县', trigger: 'blur' }],
+  detailAddress: [{ required: true, message: '请填写详细地址', trigger: 'blur' }],
+}
+
+function openAddressDialog() {
+  addressForm.value = {
+    receiverName: '',
+    receiverPhone: '',
+    province: '',
+    city: '',
+    district: '',
+    detailAddress: '',
+    // 一条地址都没有时，默认勾上 —— 后端也会强制把第一条设为默认
+    isDefault: addresses.value.length === 0,
+  }
+  addressDialog.value = true
+}
+
+async function saveAddress() {
+  const form = addressFormRef.value
+  if (!form) return
+  const valid = await form.validate().catch(() => false)
+  if (!valid) return
+
+  addressSaving.value = true
+  try {
+    const created = await createAddress({ ...addressForm.value })
+    // 重新拉一次列表：设为默认会让后端把其他地址的默认标记清掉，本地拼不准确
+    addresses.value = await fetchAddressList()
+    addressId.value = created.id
+    addressDialog.value = false
+    ElMessage.success('地址已添加')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '添加地址失败')
+  } finally {
+    addressSaving.value = false
+  }
+}
+
+onMounted(load)</script>
 
 <template>
   <div class="checkout qx-container qx-page">
@@ -124,10 +187,13 @@ onMounted(load)
     <div v-else-if="preview" class="layout">
       <div class="main">
         <section class="block qx-card">
-          <h2 class="qx-block-title">收货地址</h2>
+          <div class="block__head">
+            <h2 class="qx-block-title">收货地址</h2>
+            <el-button size="small" @click="openAddressDialog">+ 新增地址</el-button>
+          </div>
 
           <div v-if="addresses.length === 0" class="empty-address">
-            还没有收货地址，请先在数据库或后续的地址管理页面添加。
+            还没有收货地址，点右上角「新增地址」添加一个，才能提交订单。
           </div>
 
           <div v-else class="address-list">
@@ -220,9 +286,63 @@ onMounted(load)
       </aside>
     </div>
   </div>
+
+  <el-dialog
+    v-model="addressDialog"
+    title="新增收货地址"
+    width="480px"
+    :close-on-click-modal="false"
+  >
+    <el-form ref="addressFormRef" :model="addressForm" :rules="addressRules" label-width="80px">
+      <el-form-item label="收货人" prop="receiverName">
+        <el-input v-model="addressForm.receiverName" placeholder="请填写收货人姓名" maxlength="64" />
+      </el-form-item>
+      <el-form-item label="手机号" prop="receiverPhone">
+        <el-input v-model="addressForm.receiverPhone" placeholder="11 位手机号" maxlength="11" />
+      </el-form-item>
+      <el-form-item label="省份" prop="province">
+        <el-input v-model="addressForm.province" placeholder="如：广东省" maxlength="64" />
+      </el-form-item>
+      <el-form-item label="城市" prop="city">
+        <el-input v-model="addressForm.city" placeholder="如：深圳市" maxlength="64" />
+      </el-form-item>
+      <el-form-item label="区县" prop="district">
+        <el-input v-model="addressForm.district" placeholder="如：南山区" maxlength="64" />
+      </el-form-item>
+      <el-form-item label="详细地址" prop="detailAddress">
+        <el-input
+          v-model="addressForm.detailAddress"
+          type="textarea"
+          :rows="2"
+          placeholder="街道、门牌号、楼层等"
+          maxlength="255"
+        />
+      </el-form-item>
+      <el-form-item label="设为默认">
+        <el-switch v-model="addressForm.isDefault" />
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <el-button @click="addressDialog = false">取消</el-button>
+      <el-button type="primary" :loading="addressSaving" @click="saveAddress">保存</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
+.block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.block__head :deep(.qx-block-title) {
+  margin: 0;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
