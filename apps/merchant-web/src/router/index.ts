@@ -23,6 +23,16 @@ const router = createRouter({
       path: "/products/new",
       name: "product-create",
       component:()=>import('../views/product/ProductCreateView.vue')
+    },
+    {
+      path:"/login",
+      name:"login",
+      component:()=>import('../views/login/LoginView.vue')
+    },
+    {
+      path: "/seckill",
+      name: "seckill-admin",
+      component: () => import('../views/seckill/SeckillAdminView.vue')
     }
   ],
 })

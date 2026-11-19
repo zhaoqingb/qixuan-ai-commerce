@@ -8,9 +8,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
+    private final AdminInterceptor adminIterceptor;
 
-    public WebConfig(AuthInterceptor authInterceptor) {
+    public WebConfig(AuthInterceptor authInterceptor, AdminInterceptor adminInterceptor) {
         this.authInterceptor = authInterceptor;
+        this.adminIterceptor = adminInterceptor;
     }
 
     @Override
@@ -20,10 +22,11 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 // 例外：不需要身份就能访问的
                 .excludePathPatterns(
-                        "/api/auth/**",      // 注册、登录本身不能要求登录
-                        "/api/health",       // 健康检查
-                        "/api/products/**",  // 买家浏览商品
+                        "/api/auth/**", // 注册、登录本身不能要求登录
+                        "/api/health", // 健康检查
+                        "/api/products/**", // 买家浏览商品
                         "/api/categories/**" // 买家浏览分类
                 );
+        registry.addInterceptor(adminIterceptor).addPathPatterns("/api/admin/**");
     }
 }
