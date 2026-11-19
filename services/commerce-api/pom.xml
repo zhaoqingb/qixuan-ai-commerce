@@ -98,6 +98,13 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
+        <!-- Kafka：秒杀订单消息队列，替代 JVM 内存队列（进程崩溃不再丢单）。
+             Spring Boot 4 把自动配置拆进 starter —— 只引 spring-kafka 会没有 KafkaTemplate。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+
         <!-- 8. 密码哈希：只引入 BCrypt 工具类，不引入完整的 Security 过滤器链 -->
         <dependency>
             <groupId>org.springframework.security</groupId>

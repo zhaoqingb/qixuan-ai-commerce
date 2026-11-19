@@ -51,19 +51,19 @@ public class SeckillService {
     private final SeckillItemMapper itemMapper;
     private final SeckillOrderMapper orderMapper;
     private final SeckillStockService stockService;
-    private final SeckillOrderWriter orderWriter;
+    private final SeckillOrderProducer orderProducer;
     private final SeckillItemCache itemCache;
     private final TransactionTemplate transactionTemplate;
 
     public SeckillService(SeckillActivityMapper activityMapper, SeckillItemMapper itemMapper,
             SeckillOrderMapper orderMapper, SeckillStockService stockService,
-            SeckillOrderWriter orderWriter, SeckillItemCache itemCache,
+            SeckillOrderProducer orderProducer, SeckillItemCache itemCache,
             TransactionTemplate transactionTemplate) {
         this.activityMapper = activityMapper;
         this.itemMapper = itemMapper;
         this.orderMapper = orderMapper;
         this.stockService = stockService;
-        this.orderWriter = orderWriter;
+        this.orderProducer = orderProducer;
         this.itemCache = itemCache;
         this.transactionTemplate = transactionTemplate;
     }
@@ -242,10 +242,10 @@ public class SeckillService {
         order.setSkuId(item.getSkuId());
         order.setAmount(item.getSeckillPrice());
         order.setStatus(ORDER_SUCCESS);
-        if (!orderWriter.enqueue(order)) {
+        // 投递到 Kafka。同步发送，失败当场知道 —— 语义和之前"入队失败"完全一致
+        if (!orderProducer.send(order)) {
             stockService.rollback(itemId, userId);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "秒杀暂时不可用，请稍后再试");
-
         }
         return new SeckillResult(order.getOrderNo(), "QUEUING", "抢购成功，订单创建中");
     }
