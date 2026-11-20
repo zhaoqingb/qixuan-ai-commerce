@@ -275,8 +275,22 @@ public class ProductService {
                 String kw = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
 
                 long total = productSpuMapper.countOnSale(categoryId, kw);
-                List<ProductCardView> records = productSpuMapper.findOnSalePage(
-                                categoryId, kw, (safePageNo - 1) * safePageSize, safePageSize);
+
+                // 只缓存"无搜索 + 首页 + 默认页大小"这一种最热的组合。
+                // 翻页和搜索是长尾，命中率低还占缓存空间，直接查库更划算。
+                boolean cacheable = kw == null
+                                && safePageNo == 1
+                                && safePageSize == DEFAULT_PAGE_SIZE;
+
+                List<ProductCardView> records;
+                if (cacheable) {
+                        records = productCacheService.getOrLoad(categoryId,
+                                        () -> productSpuMapper.findOnSalePage(
+                                                        categoryId, null, 0, DEFAULT_PAGE_SIZE));
+                } else {
+                        records = productSpuMapper.findOnSalePage(
+                                        categoryId, kw, (safePageNo - 1) * safePageSize, safePageSize);
+                }
 
                 long pages = (total + safePageSize - 1) / safePageSize;
                 return new PageResult<>(records, total, safePageNo, safePageSize, pages);
