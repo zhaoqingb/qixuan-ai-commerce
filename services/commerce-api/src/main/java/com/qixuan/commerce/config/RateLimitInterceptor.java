@@ -47,13 +47,15 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         if (method.getBeanType() == MallProductController.class
                 && "list".equals(method.getMethod().getName())) {
             bucket = RateLimiter.BUCKET_PRODUCT_LIST;
-            capacity = 200;
-            rate = 100;
+            // 缓存命中实测 1612 RPS，取 50% 安全系数
+            capacity = 1200;
+            rate = 800;
         } else if (method.getBeanType() == SeckillController.class
                 && "buy".equals(method.getMethod().getName())) {
             bucket = RateLimiter.BUCKET_SECKILL_BUY;
-            capacity = 40;
-            rate = 20;
+            // 2000 件库存，目标 4 秒抢完：500/s，桶容量 1000 允许开抢瞬间洪峰
+            capacity = 1000;
+            rate = 500;
         }
 
         if (bucket == null) {
