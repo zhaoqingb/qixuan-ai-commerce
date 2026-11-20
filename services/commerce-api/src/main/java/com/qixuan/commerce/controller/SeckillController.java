@@ -37,21 +37,15 @@ import java.util.List;
 public class SeckillController {
 
     private final SeckillService seckillService;
-    private final SeckillStockService stockService;
-    private final SeckillItemMapper itemMapper;
     private final SeckillOrderMapper orderMapper;
     private final SeckillConvertService convertService;
-    private final SeckillReserveService reserveService;
 
-    public SeckillController(SeckillService seckillService, SeckillStockService stockService,
-            SeckillItemMapper itemMapper, SeckillOrderMapper orderMapper,
-            SeckillConvertService convertService, SeckillReserveService reserveService) {
+    public SeckillController(SeckillService seckillService,
+            SeckillOrderMapper orderMapper,
+            SeckillConvertService convertService) {
         this.seckillService = seckillService;
-        this.stockService = stockService;
-        this.itemMapper = itemMapper;
         this.orderMapper = orderMapper;
         this.convertService = convertService;
-        this.reserveService = reserveService;
     }
 
     @PostMapping("/items/{itemId}/buy")
@@ -88,45 +82,6 @@ public class SeckillController {
             @PathVariable String orderNo) {
         TradeOrder trade = convertService.convert(userId, orderNo);
         return new SeckillResult(trade.getOrderNo(), trade.getStatus(), "订单已创建，请尽快支付");
-    }
-
-    /**
-     * 活动上线前预留库存：把这批货从 sku 可用库存划到锁定。
-     * 正式上线前必须收进管理员权限。
-     */
-    @PostMapping("/items/{itemId}/reserve")
-    public SeckillResult reserve(@PathVariable Long itemId) {
-        int qty = reserveService.reserve(itemId);
-        return new SeckillResult(null, "RESERVED", "已预留 " + qty + " 件");
-    }
-
-    /** 活动结束后释放没卖完的库存 */
-    @PostMapping("/items/{itemId}/release")
-    public SeckillResult release(@PathVariable Long itemId) {
-        int qty = reserveService.release(itemId);
-        return new SeckillResult(null, "RELEASED", "已释放 " + qty + " 件");
-    }
-
-    /** 把数据库里的秒杀库存灌进 Redis，压测前调一次 */
-    @PostMapping("/items/{itemId}/stock/sync")
-    public SeckillResult syncStock(@PathVariable Long itemId) {
-        SeckillItem item = itemMapper.selectById(itemId);
-        if (item == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "秒杀商品不存在");
-        }
-        boolean loaded = stockService.loadStock(itemId, item.getSeckillStock());
-        if (loaded) {
-            return new SeckillResult(null, "SYNC", "已预热 " + item.getSeckillStock());
-        }
-        Integer remain = stockService.currentStock(itemId);
-        return new SeckillResult(null, "SYNC", "已存在，跳过（当前 " + (remain == null ? "未知" : remain) + "）");
-    }
-
-    /** 看 Redis 里还剩多少（-1 表示 key 不存在） */
-    @GetMapping("/items/{itemId}/stock")
-    public SeckillResult stock(@PathVariable Long itemId) {
-        Integer stock = stockService.currentStock(itemId);
-        return new SeckillResult(null, "STOCK", stock == null ? "未预热" : String.valueOf(stock));
     }
 
     @GetMapping("/orders/{orderNo}")

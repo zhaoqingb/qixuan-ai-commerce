@@ -171,7 +171,8 @@ async function cancel(order: OrderCard) {
 
 async function loadOrders() {
   try {
-    rows.value = await fetchOrders(CURRENT_USER_ID)
+    const result = await fetchOrders()
+    rows.value = result.records
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '订单加载失败')
   } finally {

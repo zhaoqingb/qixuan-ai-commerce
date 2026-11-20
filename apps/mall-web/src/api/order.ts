@@ -1,13 +1,21 @@
 import http from './http'
-import type { CancelOrderResult, OrderDetailRow, OrderItemRow, PayOrderResult } from '@/types/mall'
+import type {
+  CancelOrderResult,
+  OrderDetailRow,
+  OrderItemRow,
+  PageResult,
+  PayOrderResult,
+} from '@/types/mall'
 
 /**
- * 我的订单。
+ * 我的订单（分页）。
  * 返回的是「商品行」而不是「订单行」：一个订单里有几件商品就有几条记录，
  * 前端在 views/OrderListView.vue 里按 tradeOrderId 分组。
+ *
+ * 注意：userId 不再通过参数传，后端从 token 里取，传了也会被忽略。
  */
-export async function fetchOrders(userId: number): Promise<OrderItemRow[]> {
-  const { data } = await http.get<OrderItemRow[]>('/orders', { params: { userId } })
+export async function fetchOrders(page = 1, size = 50): Promise<PageResult<OrderItemRow>> {
+  const { data } = await http.get<PageResult<OrderItemRow>>('/orders', { params: { page, size } })
   return data
 }
 

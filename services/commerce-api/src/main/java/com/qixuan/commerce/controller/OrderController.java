@@ -1,8 +1,10 @@
 package com.qixuan.commerce.controller;
 
 import com.qixuan.commerce.dto.CancelOrderResponse;
+import com.qixuan.commerce.dto.CursorPage;
 import com.qixuan.commerce.dto.OrderDetailRow;
 import com.qixuan.commerce.dto.OrderItemRow;
+import com.qixuan.commerce.dto.PageResult;
 import com.qixuan.commerce.dto.PayOrderResponse;
 import com.qixuan.commerce.service.OrderCloseService;
 import com.qixuan.commerce.service.OrderService;
@@ -32,8 +34,21 @@ public class OrderController {
     }
 
     @GetMapping
-    public List<OrderItemRow> list(@RequestAttribute("userId") Long userId) {
-        return orderService.list(userId);
+    public PageResult<OrderItemRow> list(@RequestAttribute("userId") Long userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return orderService.page(userId, page, size);
+    }
+
+    /**
+     * 游标分页：深分页 / 无限滚动场景。
+     * 第一次不传 lastId，之后把上一页返回的 nextCursor 原样带上。
+     */
+    @GetMapping("/cursor")
+    public CursorPage<OrderItemRow> cursor(@RequestAttribute("userId") Long userId,
+            @RequestParam(required = false) Long lastId,
+            @RequestParam(defaultValue = "10") int size) {
+        return orderService.cursor(userId, lastId, size);
     }
 
     @GetMapping("/{orderNo}")

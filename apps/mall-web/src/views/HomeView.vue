@@ -74,10 +74,12 @@ async function loadProducts() {
   loading.value = true
   errorMessage.value = ''
   try {
-    products.value = await fetchProducts({
+    const result = await fetchProducts({
       categoryId: activeCategoryId.value ?? undefined,
       keyword: activeKeyword.value || undefined,
+      size: 60,
     })
+    products.value = result.records
   } catch (error) {
     products.value = []
     errorMessage.value = error instanceof Error ? error.message : '商品加载失败'

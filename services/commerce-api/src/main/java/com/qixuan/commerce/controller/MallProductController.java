@@ -1,5 +1,6 @@
 package com.qixuan.commerce.controller;
 
+import com.qixuan.commerce.dto.PageResult;
 import com.qixuan.commerce.dto.ProductCardView;
 import com.qixuan.commerce.dto.ProductDetailResponse;
 import com.qixuan.commerce.service.ProductService;
@@ -21,10 +22,12 @@ public class MallProductController {
     }
 
     @GetMapping
-    public List<ProductCardView> list(
+    public PageResult<ProductCardView> list(
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String keyword) {
-        return productService.listOnSale(categoryId, keyword);
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return productService.pageOnSale(categoryId, keyword, page, size);
     }
 
     @GetMapping("/{id}")

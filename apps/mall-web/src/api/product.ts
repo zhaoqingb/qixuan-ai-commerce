@@ -1,14 +1,16 @@
 import http from './http'
-import type { ProductCard, ProductDetail } from '@/types/mall'
+import type { PageResult, ProductCard, ProductDetail } from '@/types/mall'
 
 export interface ProductQuery {
   categoryId?: number
   keyword?: string
+  page?: number
+  size?: number
 }
 
 /** 在售商品列表，后端已按 ON_SALE + 店铺 ACTIVE 过滤 */
-export async function fetchProducts(query: ProductQuery = {}): Promise<ProductCard[]> {
-  const { data } = await http.get<ProductCard[]>('/products', { params: query })
+export async function fetchProducts(query: ProductQuery = {}): Promise<PageResult<ProductCard>> {
+  const { data } = await http.get<PageResult<ProductCard>>('/products', { params: query })
   return data
 }
 

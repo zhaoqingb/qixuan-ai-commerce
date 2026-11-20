@@ -20,6 +20,8 @@ VALUES (1, NULL, '电脑外设', 1, 1)
 ON DUPLICATE KEY UPDATE id = id;
 
 -- ③ 商品 SPU
+--    注意状态值：SPU 用 ON_SALE，SKU 用 ACTIVE —— 项目里这两个语义不同名，
+--    SPU 的列表查询条件是 status='ON_SALE'，SKU 的加购校验是 status='ACTIVE'。
 INSERT INTO product_spu
     (id, store_id, category_id, brand_id, title, subtitle, main_image_url, description, status)
 VALUES
@@ -31,7 +33,7 @@ ON DUPLICATE KEY UPDATE id = id;
 INSERT INTO product_sku
     (id, spu_id, sku_code, spec_json, sale_price, list_price, status)
 VALUES
-    (1, 1, 'MS-001', '{"color":"黑色"}', 129.00, 169.00, 'ON_SALE')
+    (1, 1, 'MS-001', '{"color":"黑色"}', 129.00, 169.00, 'ACTIVE')
 ON DUPLICATE KEY UPDATE id = id;
 
 -- ⑤ 库存：给足量，方便反复压测（这张表主键是 sku_id，没有 id 列）

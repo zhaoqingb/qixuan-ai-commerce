@@ -71,4 +71,63 @@ public interface ProductSpuMapper extends BaseMapper<ProductSpu> {
             """)
     List<ProductCardView> findOnSale(@Param("categoryId") Long categoryId,
             @Param("keyword") String keyword);
+
+    /**
+     * 分页查在售商品。
+     *
+     * 为什么不用 MyBatis-Plus 的 Page：这条 SQL 带 GROUP BY（按 SPU 聚合 SKU 的库存和最低价），
+     * MP 自动生成的 count 会变成 `SELECT COUNT(*) ... GROUP BY`，返回多行，
+     * 取第一行当 total 就是错的。所以 count 单独写一条不带 GROUP BY 的。
+     */
+    @Select("""
+            <script>
+            SELECT
+                p.id,
+                p.title,
+                p.subtitle,
+                p.main_image_url,
+                MIN(sku.sale_price) AS min_price,
+                st.store_name,
+                c.name AS category_name,
+                COALESCE(SUM(inv.available_qty), 0) AS available_stock,
+                COALESCE(SUM(inv.sold_qty), 0) AS sold_count
+            FROM product_spu p
+            JOIN store st ON st.id = p.store_id
+            JOIN category c ON c.id = p.category_id
+            LEFT JOIN product_sku sku ON sku.spu_id = p.id AND sku.status = 'ACTIVE'
+            LEFT JOIN sku_inventory inv ON inv.sku_id = sku.id
+            WHERE p.status = 'ON_SALE' AND st.status = 'ACTIVE'
+            <if test="categoryId!=null">
+              AND p.category_id = #{categoryId}
+            </if>
+            <if test="keyword!=null and keyword!=''">
+              AND p.title LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            GROUP BY p.id, p.title, p.subtitle, p.main_image_url, st.store_name, c.name
+            ORDER BY p.id DESC
+            LIMIT #{offset}, #{size}
+            </script>
+            """)
+    List<ProductCardView> findOnSalePage(@Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    /** 和 findOnSalePage 条件完全一致，但不做 GROUP BY，用于取总数 */
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM product_spu p
+            JOIN store st ON st.id = p.store_id
+            WHERE p.status = 'ON_SALE' AND st.status = 'ACTIVE'
+            <if test="categoryId!=null">
+              AND p.category_id = #{categoryId}
+            </if>
+            <if test="keyword!=null and keyword!=''">
+              AND p.title LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            </script>
+            """)
+    long countOnSale(@Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword);
 }

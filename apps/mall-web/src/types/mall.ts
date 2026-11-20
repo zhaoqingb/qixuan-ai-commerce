@@ -176,3 +176,12 @@ export interface CancelOrderResult {
   status: string
   closedAt: string
 }
+
+/** 后端分页约定的统一返回结构 */
+export interface PageResult<T> {
+  records: T[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}

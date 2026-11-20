@@ -4,6 +4,7 @@ import com.qixuan.commerce.common.BizStatus;
 
 import com.qixuan.commerce.dto.ProductCardView;
 import com.qixuan.commerce.dto.ProductListItem;
+import com.qixuan.commerce.dto.PageResult;
 import com.qixuan.commerce.dto.ProductCreateRequest;
 import com.qixuan.commerce.dto.ProductCreateResponse;
 import com.qixuan.commerce.dto.ProductDetailResponse;
@@ -236,6 +237,12 @@ public class ProductService {
                 productCacheService.evictAll();
         }
 
+        /** 单页默认条数 */
+        private static final int DEFAULT_PAGE_SIZE = 20;
+
+        /** 单页最大条数 */
+        private static final int MAX_PAGE_SIZE = 100;
+
         public List<ProductCardView> listOnSale(Long categoryId, String keyword) {
                 String kw = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
 
@@ -246,6 +253,33 @@ public class ProductService {
 
                 return productCacheService.getOrLoad(categoryId,
                                 () -> productSpuMapper.findOnSale(categoryId, null));
+        }
+
+        /**
+         * 分页查在售商品。
+         *
+         * 这里刻意不走 ProductCacheService：
+         *   缓存的是"整份列表"，分页后每页内容不同，要给每个 (分类, 关键词, 页码) 都建 key，
+         *   key 空间膨胀，而上下架时又要清理一整片 key，得不偿失。
+         *   分页查询靠 (status, category_id) 索引 + LIMIT 就够快。
+         */
+        public PageResult<ProductCardView> pageOnSale(Long categoryId, String keyword,
+                        int pageNo, int pageSize) {
+
+                int safePageNo = pageNo < 1 ? 1 : pageNo;
+                int safePageSize = pageSize < 1 ? DEFAULT_PAGE_SIZE : pageSize;
+                if (safePageSize > MAX_PAGE_SIZE) {
+                        safePageSize = MAX_PAGE_SIZE;
+                }
+
+                String kw = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+
+                long total = productSpuMapper.countOnSale(categoryId, kw);
+                List<ProductCardView> records = productSpuMapper.findOnSalePage(
+                                categoryId, kw, (safePageNo - 1) * safePageSize, safePageSize);
+
+                long pages = (total + safePageSize - 1) / safePageSize;
+                return new PageResult<>(records, total, safePageNo, safePageSize, pages);
         }
 
         public List<ProductSpu> listProducts(Long categoryId, String keyword) {
