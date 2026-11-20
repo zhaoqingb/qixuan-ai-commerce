@@ -9,14 +9,20 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
     private final AdminInterceptor adminIterceptor;
+    private final RateLimitInterceptor rateLimitInterceptor;
 
-    public WebConfig(AuthInterceptor authInterceptor, AdminInterceptor adminInterceptor) {
+    public WebConfig(AuthInterceptor authInterceptor, AdminInterceptor adminInterceptor,
+            RateLimitInterceptor rateLimitInterceptor) {
         this.authInterceptor = authInterceptor;
         this.adminIterceptor = adminInterceptor;
+        this.rateLimitInterceptor = rateLimitInterceptor;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 限流注册在鉴权之前：被限掉的请求连认证都不用做，省时间
+        registry.addInterceptor(rateLimitInterceptor).addPathPatterns("/api/**");
+
         registry.addInterceptor(authInterceptor)
                 // 所有接口默认都要登录
                 .addPathPatterns("/api/**")
