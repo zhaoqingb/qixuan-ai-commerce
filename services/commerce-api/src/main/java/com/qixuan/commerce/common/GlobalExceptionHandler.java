@@ -190,7 +190,11 @@ public class GlobalExceptionHandler {
         public ResponseEntity<ApiError> handleDuplicateKey(
                         DuplicateKeyException ex,
                         HttpServletRequest request) {
+                // 唯一约束冲突可能来自任何表（SKU 编码、秒杀订单、库存流水…），
+                // 提示语不能写死成某张表的字段，否则会把排查方向带偏。
+                // 真实约束名在 ex.getMessage() 里（Duplicate entry 'xxx' for key 'yyy'），记日志供排查。
+                log.warn("唯一约束冲突：{}", ex.getMessage());
                 return ResponseEntity.status(HttpStatus.CONFLICT)
-                                .body(error("DUPLICATE_KEY", "数据唯一约束冲突，请检查sku编码是否重复", request));
+                                .body(error("DUPLICATE_KEY", "数据已存在，请勿重复提交", request));
         }
 }

@@ -1,29 +1,33 @@
 package com.qixuan.commerce.service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.qixuan.commerce.dto.RefundApplyRequest;
 import com.qixuan.commerce.dto.RefundApplyResponse;
 import com.qixuan.commerce.entity.OrderItem;
 import com.qixuan.commerce.entity.RefundRequest;
-import com.qixuan.commerce.entity.StoreOrder;
 import com.qixuan.commerce.entity.Store;
+import com.qixuan.commerce.entity.StoreOrder;
+import com.qixuan.commerce.entity.TradeOrder;
 import com.qixuan.commerce.mapper.InventoryLogMapper;
 import com.qixuan.commerce.mapper.OrderItemMapper;
 import com.qixuan.commerce.mapper.RefundRequestMapper;
 import com.qixuan.commerce.mapper.SkuInventoryMapper;
 import com.qixuan.commerce.mapper.StoreMapper;
 import com.qixuan.commerce.mapper.StoreOrderMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
+import com.qixuan.commerce.mapper.TradeOrderMapper;
 
 @Service
 public class RefundService {
@@ -36,20 +40,24 @@ public class RefundService {
     private static final String STATUS_REQUESTED = "REQUESTED";
     private static final String STATUS_APPROVED = "APPROVED";
     private static final String STATUS_REJECTED = "REJECTED";
+    private static final String STATUS_REFUNDED = "REFUNDED";
 
     private final RefundRequestMapper refundRequestMapper;
     private final OrderItemMapper orderItemMapper;
     private final StoreOrderMapper storeOrderMapper;
+    private final TradeOrderMapper tradeOrderMapper;
     private final StoreMapper storeMapper;
     private final SkuInventoryMapper skuInventoryMapper;
     private final InventoryLogMapper inventoryLogMapper;
 
     public RefundService(RefundRequestMapper refundRequestMapper, OrderItemMapper orderItemMapper,
-            StoreOrderMapper storeOrderMapper, StoreMapper storeMapper,
-            SkuInventoryMapper skuInventoryMapper, InventoryLogMapper inventoryLogMapper) {
+            StoreOrderMapper storeOrderMapper, TradeOrderMapper tradeOrderMapper,
+            StoreMapper storeMapper, SkuInventoryMapper skuInventoryMapper,
+            InventoryLogMapper inventoryLogMapper) {
         this.refundRequestMapper = refundRequestMapper;
         this.orderItemMapper = orderItemMapper;
         this.storeOrderMapper = storeOrderMapper;
+        this.tradeOrderMapper = tradeOrderMapper;
         this.storeMapper = storeMapper;
         this.skuInventoryMapper = skuInventoryMapper;
         this.inventoryLogMapper = inventoryLogMapper;
@@ -115,7 +123,7 @@ public class RefundService {
         }
 
         RefundRequest patch = new RefundRequest();
-        patch.setStatus(STATUS_APPROVED);
+        patch.setStatus(STATUS_REFUNDED);
         patch.setResolvedAt(LocalDateTime.now());
 
         int rows = refundRequestMapper.update(patch, new LambdaUpdateWrapper<RefundRequest>()
@@ -132,6 +140,34 @@ public class RefundService {
             }
             inventoryLogMapper.insert(item.getSkuId(), refund.getRefundNo(), "REFUND", refund.getQuantity());
         }
+
+        // 子单退完 → 子单改 REFUNDED；所有子单都退完 → 主单也改
+        if (isFullRefunded(sub.getId())) {
+            StoreOrder patchSub = new StoreOrder();
+            patchSub.setId(sub.getId());
+            patchSub.setStatus(STATUS_REFUNDED);
+            storeOrderMapper.updateById(patchSub);
+
+            if (isTradeOrderFullyRefunded(sub.getTradeOrderId())) {
+                TradeOrder patchTrade = new TradeOrder();
+                patchTrade.setId(sub.getTradeOrderId());
+                patchTrade.setStatus(STATUS_REFUNDED);
+                tradeOrderMapper.updateById(patchTrade);
+            }
+        }
+    }
+
+    /** 主单下所有子单都是 REFUNDED，主单才算整体退完 */
+    private boolean isTradeOrderFullyRefunded(Long tradeOrderId) {
+        List<StoreOrder> subs = storeOrderMapper.selectList(
+                new LambdaQueryWrapper<StoreOrder>()
+                        .eq(StoreOrder::getTradeOrderId, tradeOrderId));
+        for (StoreOrder sub : subs) {
+            if (!STATUS_REFUNDED.equals(sub.getStatus())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Transactional
@@ -157,5 +193,36 @@ public class RefundService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "退款申请已被处理");
         }
 
+    }
+
+    /**
+     * 子单下的每一条明细是否都退完了。
+     *
+     * 两个关键点：
+     *   1. 累加的是退款单的 quantity（件数），不是条数（count）
+     *   2. 累加变量放在循环内，否则上一条明细的退款数会污染下一条的判断
+     */
+    private boolean isFullRefunded(Long storeOrderId) {
+
+        List<OrderItem> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>()
+                        .eq(OrderItem::getStoreOrderId, storeOrderId));
+
+        for (OrderItem item : items) {
+            List<RefundRequest> refunds = refundRequestMapper.selectList(
+                    new LambdaQueryWrapper<RefundRequest>()
+                            .eq(RefundRequest::getOrderItemId, item.getId())
+                            .in(RefundRequest::getStatus, STATUS_APPROVED, STATUS_REFUNDED));
+
+            int refunded = 0;
+            for (RefundRequest refund : refunds) {
+                refunded += refund.getQuantity();
+            }
+
+            if (refunded < item.getQuantity()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

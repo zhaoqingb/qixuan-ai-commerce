@@ -67,7 +67,11 @@ public class SeckillReserveService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "SKU 可用库存不足，无法预留 " + qty + " 件，请先补货");
         }
-        inventoryLogMapper.insert(item.getSkuId(), "SK-RESERVE-" + itemId, "LOCK", qty);
+        // 业务号必须带上时间：同一个活动可以反复上下线，
+        // 而 inventory_log 有 UNIQUE(sku_id, business_no, operation)，
+        // 用固定业务号会导致第二次上线撞唯一键。
+        inventoryLogMapper.insert(item.getSkuId(),
+                "SK-RESERVE-" + itemId + "-" + System.currentTimeMillis(), "LOCK", qty);
 
         int rows = itemMapper.update(null, new LambdaUpdateWrapper<SeckillItem>()
                 .set(SeckillItem::getReservedQty, qty)
@@ -105,7 +109,8 @@ public class SeckillReserveService {
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                         "锁定数量不足，无法释放，需要人工对账");
             }
-            inventoryLogMapper.insert(item.getSkuId(), "SK-RELEASE-" + itemId, "RELEASE", toRelease);
+            inventoryLogMapper.insert(item.getSkuId(),
+                    "SK-RELEASE-" + itemId + "-" + System.currentTimeMillis(), "RELEASE", toRelease);
         }
 
         itemMapper.update(null, new LambdaUpdateWrapper<SeckillItem>()
