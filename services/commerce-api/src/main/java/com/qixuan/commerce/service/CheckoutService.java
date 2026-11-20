@@ -1,6 +1,7 @@
 package com.qixuan.commerce.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.qixuan.commerce.dto.CheckoutItemView;
 import com.qixuan.commerce.dto.CheckoutPreviewResponse;
 import com.qixuan.commerce.dto.CheckoutPreviewResponse.StoreGroup;
@@ -25,13 +26,10 @@ import org.springframework.web.server.ResponseStatusException;
 import com.qixuan.commerce.mapper.InventoryLogMapper;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,7 +37,6 @@ public class CheckoutService {
 
     private static final BigDecimal FREE_FREIGHT_THRESHOLD = new BigDecimal("99.00");
     private static final BigDecimal FREIGHT_FEE = new BigDecimal("10.00");
-    private static final DateTimeFormatter ORDER_NO_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String STATUS_PENDING_PAYMENT = "PENDING_PAYMENT";
 
     private final CartItemMapper cartItemMapper;
@@ -277,8 +274,9 @@ public class CheckoutService {
     }
 
     private String generateOrderNo() {
-        return "Q" + LocalDateTime.now().format(ORDER_NO_FORMAT)
-                + ThreadLocalRandom.current().nextInt(1000, 10000);
+        // 雪花 ID：同毫秒内靠序列号区分，避免"时间戳+4位随机"在并发下撞号
+        // （唯一索引能兜底不产生脏数据，但撞号会让本该成功的下单变成 500）
+        return "Q" + IdWorker.getIdStr();
     }
 
     private static String jsonString(String value) {

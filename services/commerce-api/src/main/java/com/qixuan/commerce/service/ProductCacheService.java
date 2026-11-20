@@ -4,12 +4,12 @@ import com.qixuan.commerce.dto.ProductCardView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
@@ -35,6 +35,20 @@ public class ProductCacheService {
 
     /** 空结果只缓存 30 秒：防穿透，但也不能让「刚上架」等太久 */
     private static final Duration EMPTY_TTL = Duration.ofSeconds(30);
+
+    /** 击穿锁最多等 3 轮，每轮 50ms —— 总计 150ms，比直接查库还快就放弃等 */
+    private static final int LOCK_RETRY_TIMES = 3;
+    private static final int LOCK_RETRY_INTERVAL_MS = 50;
+    /** 锁的 TTL 要大于一次 DB 查询的正常耗时，但不能太长（持锁者崩了要能自动释放） */
+    private static final Duration LOCK_TTL = Duration.ofSeconds(3);
+
+    /** 安全释放锁：GET 和 DEL 必须在一条 Lua 里，否则两步之间锁可能易主 */
+    private static final String RELEASE_LOCK_SCRIPT =
+            "if redis.call('get', KEYS[1]) == ARGV[1] "
+            + "then return redis.call('del', KEYS[1]) else return 0 end";
+
+    private final DefaultRedisScript<Long> releaseLockScript =
+            new DefaultRedisScript<>(RELEASE_LOCK_SCRIPT, Long.class);
 
     private final StringRedisTemplate redis;
     private final JsonMapper jsonMapper;
@@ -69,10 +83,73 @@ public class ProductCacheService {
             return loader.get();
         }
 
-        // 缓存链路正常，但没命中 —— 查库。
-        // 故意放在 try 外面：数据库异常不该被当成"缓存异常"吞掉。
-        List<ProductCardView> fresh = loader.get();
+        // 缓存未命中：可能碰上「热点 key 刚过期」的击穿场景。
+        // 1000 个请求同时发现没缓存，如果都去查库，DB 会被瞬间打穿。
+        // 用 SETNX 抢锁：只有一个请求查库并回写，其余短等后重试读缓存。
+        return loadWithLock(key, categoryId, loader);
+    }
 
+    /**
+     * 缓存击穿防护：分布式互斥锁 + 有限重试。
+     *
+     * 为什么不用本地 synchronized：多实例部署时每个 JVM 各锁各的，挡不住。
+     * 为什么锁要带 TTL：拿到锁的线程如果崩了，锁不释放会永远没人能查库。
+     */
+    private List<ProductCardView> loadWithLock(String key, Long categoryId,
+            Supplier<List<ProductCardView>> loader) {
+
+        String lockKey = key + ":lock";
+        String lockValue = String.valueOf(ThreadLocalRandom.current().nextLong());
+
+        for (int attempt = 0; attempt < LOCK_RETRY_TIMES; attempt++) {
+            try {
+                // SETNX + 过期时间，一条命令保证原子：拿到锁的才有资格查库
+                Boolean locked = redis.opsForValue().setIfAbsent(
+                        lockKey, lockValue, LOCK_TTL);
+
+                if (Boolean.TRUE.equals(locked)) {
+                    try {
+                        return loadAndCache(key, loader);
+                    } finally {
+                        // 只删自己的锁：不能直接 DEL，否则可能删掉别人后补的锁
+                        releaseLock(lockKey, lockValue);
+                    }
+                }
+
+                // 没抢到锁：说明别人正在查库，等它写完，再读一次缓存
+                Thread.sleep(LOCK_RETRY_INTERVAL_MS);
+                String cached = redis.opsForValue().get(key);
+                if (cached != null) {
+                    ProductCardView[] array = jsonMapper.readValue(cached, ProductCardView[].class);
+                    return Arrays.asList(array);
+                }
+            } catch (InterruptedException ex) {
+                // 线程被中断：恢复标志位，降级查库
+                Thread.currentThread().interrupt();
+                return loader.get();
+            } catch (Exception ex) {
+                // Redis 异常不该拖垮业务：降级查库
+                log.warn("缓存击穿防护不可用，降级查库", ex);
+                return loader.get();
+            }
+        }
+
+        // 重试次数用尽（比如持锁线程崩了、锁还没到 TTL）：
+        // 与其让所有请求一直等，不如直接回源 —— 宁可慢，不可全部失败
+        return loader.get();
+    }
+
+    /** 查库 + 写回缓存，和原来的 Cache-Aside 逻辑一致 */
+    private List<ProductCardView> loadAndCache(String key, Supplier<List<ProductCardView>> loader) {
+        // 双重检查：拿到锁之后再读一次缓存，
+        // 因为排队期间可能已经有前一个持锁者写好了
+        String cached = redis.opsForValue().get(key);
+        if (cached != null) {
+            ProductCardView[] array = jsonMapper.readValue(cached, ProductCardView[].class);
+            return Arrays.asList(array);
+        }
+
+        List<ProductCardView> fresh = loader.get();
         try {
             if (fresh.isEmpty()) {
                 redis.opsForValue().set(key, "[]", EMPTY_TTL);
@@ -82,8 +159,21 @@ public class ProductCacheService {
         } catch (Exception ex) {
             log.warn("写商品缓存失败，忽略", ex);
         }
-
         return fresh;
+    }
+
+    /**
+     * 安全释放锁：比较 value 一致才删。
+     * 用 Lua 而非先 GET 再 DEL —— 两步之间锁可能过期被别人抢走，
+     * 那时 DEL 删的就是别人的锁了。
+     */
+    private void releaseLock(String lockKey, String lockValue) {
+        try {
+            redis.execute(releaseLockScript, List.of(lockKey), lockValue);
+        } catch (Exception ex) {
+            // 锁没删掉也没关系：TTL 到期会自动释放
+            log.warn("释放缓存锁失败，等待 TTL 自动过期", ex);
+        }
     }
 
     /**

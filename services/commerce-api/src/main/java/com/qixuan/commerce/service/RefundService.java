@@ -2,11 +2,10 @@ package com.qixuan.commerce.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +30,6 @@ import com.qixuan.commerce.mapper.TradeOrderMapper;
 
 @Service
 public class RefundService {
-
-    private static final DateTimeFormatter REFUND_NO_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     /** 只有付过款、货还/还在路上的订单才能退 */
     private static final Set<String> REFUNDABLE_STATUS = Set.of("PAID", "SHIPPED", "COMPLETED");
@@ -103,8 +100,7 @@ public class RefundService {
     }
 
     private String generateRefundNo() {
-        return "R" + LocalDateTime.now().format(REFUND_NO_FORMAT)
-                + ThreadLocalRandom.current().nextInt(1000, 10000);
+        return "R" + IdWorker.getIdStr();
     }
 
     @Transactional

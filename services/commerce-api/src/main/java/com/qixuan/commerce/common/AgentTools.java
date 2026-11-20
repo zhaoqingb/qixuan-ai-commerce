@@ -1,5 +1,7 @@
 package com.qixuan.commerce.common;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.qixuan.commerce.entity.AiActionApproval;
 import com.qixuan.commerce.entity.AiToolAudit;
+import com.qixuan.commerce.entity.OrderItem;
 import com.qixuan.commerce.entity.ProductSku;
 import com.qixuan.commerce.entity.ProductSpu;
 import com.qixuan.commerce.entity.RefundRequest;
@@ -22,6 +25,7 @@ import com.qixuan.commerce.entity.Store;
 import com.qixuan.commerce.entity.StoreOrder;
 import com.qixuan.commerce.entity.TradeOrder;
 import com.qixuan.commerce.mapper.AiToolAuditMapper;
+import com.qixuan.commerce.mapper.OrderItemMapper;
 import com.qixuan.commerce.mapper.ProductSkuMapper;
 import com.qixuan.commerce.mapper.ProductSpuMapper;
 import com.qixuan.commerce.mapper.RefundRequestMapper;
@@ -63,13 +67,15 @@ public class AgentTools {
     private final JsonMapper jsonMapper;
     private final ProductSpuMapper productSpuMapper;
     private final ProductSkuMapper productSkuMapper;
+    private final OrderItemMapper orderItemMapper;
 
     public AgentTools(TradeOrderMapper tradeOrderMapper, StoreOrderMapper storeOrderMapper,
             ShipmentMapper shipmentMapper, SkuInventoryMapper skuInventoryMapper,
             RefundRequestMapper refundRequestMapper, StoreMapper storeMapper,
             SkuInventoryService skuInventoryService, AiApprovalService approvalService,
             AiToolAuditMapper auditMapper, JsonMapper jsonMapper,
-            ProductSpuMapper productSpuMapper, ProductSkuMapper productSkuMapper) {
+            ProductSpuMapper productSpuMapper, ProductSkuMapper productSkuMapper,
+            OrderItemMapper orderItemMapper) {
         this.tradeOrderMapper = tradeOrderMapper;
         this.storeOrderMapper = storeOrderMapper;
         this.shipmentMapper = shipmentMapper;
@@ -82,6 +88,7 @@ public class AgentTools {
         this.jsonMapper = jsonMapper;
         this.productSpuMapper = productSpuMapper;
         this.productSkuMapper = productSkuMapper;
+        this.orderItemMapper = orderItemMapper;
     }
 
     /**
@@ -140,6 +147,18 @@ public class AgentTools {
                         "description", "返回几个商品，默认 5，最多 20")),
                 List.of()));
 
+        Map<String, Object> recommendArgs = new LinkedHashMap<>();
+        recommendArgs.put("keyword", Map.of(
+                "type", "string",
+                "description", "商品关键词，如「耳机」「运动」。用户没说具体品类时不填，直接推荐热门商品"));
+        recommendArgs.put("limit", Map.of(
+                "type", "integer",
+                "description", "推荐几个商品，默认 5，最多 10"));
+        list.add(tool("recommend_products",
+                "智能导购：根据关键词推荐在售商品，按销量从高到低排序，返回商品标题、最低价和已售件数。"
+                        + "用户说「推荐」「有什么好买的」「想买XX」时用这个。所有登录用户都可用。",
+                recommendArgs, List.of()));
+
         // ===== 商家专属：按 store.owner_user_id 判断 =====
         Long storeId = findOwnedStoreId(userId);
         if (storeId == null) {
@@ -155,6 +174,16 @@ public class AgentTools {
                         + "发货前用它拿 storeOrderId / 子单号，不要猜。"
                         + "买家查自己的订单不要用这个，用 list_my_orders。",
                 pendingArgs, List.of()));
+
+        Map<String, Object> salesArgs = new LinkedHashMap<>();
+        salesArgs.put("limit", Map.of(
+                "type", "integer",
+                "description", "返回几个热销商品，默认 5，最多 10"));
+        list.add(tool("analyze_sales",
+                "经营分析：统计【当前商家自己店铺】已付款订单的总销售额、订单数、客单价，"
+                        + "以及销量最高的商品排行。用户说「卖得怎么样」「销售额多少」「哪些商品好卖」时用这个。"
+                        + "只统计 PAID/SHIPPED/COMPLETED 的订单，不含未付款和已取消。",
+                salesArgs, List.of()));
 
         Map<String, Object> restockArgs = new LinkedHashMap<>();
         restockArgs.put("skuId", Map.of(
@@ -252,6 +281,8 @@ public class AgentTools {
             case "restock_sku" -> requestRestock(userId, conversationId, argumentsJson);
             case "ship_order" -> requestShip(userId, conversationId, argumentsJson);
             case "list_my_products" -> listMyProducts(userId, argumentsJson);
+            case "recommend_products" -> recommendProducts(userId, argumentsJson);
+            case "analyze_sales" -> analyzeSales(userId, argumentsJson);
             default -> "{\"error\":\"未知工具：" + name + "\"}";
         };
     }
@@ -645,6 +676,131 @@ public class AgentTools {
         } catch (Exception ex) {
             return "{\"error\":\"查询商品失败\"}";
         }
+    }
+
+    /** 智能导购：按关键词筛在售商品，按已售件数降序推荐 */
+    private String recommendProducts(Long userId, String argumentsJson) {
+        try {
+            JsonNode args = jsonMapper.readTree(argumentsJson == null || argumentsJson.isBlank()
+                    ? "{}" : argumentsJson);
+            String keyword = args.path("keyword").asText("");
+            int limit = parseLimit(argumentsJson);
+
+            List<ProductSpu> spus = productSpuMapper.selectList(new LambdaQueryWrapper<ProductSpu>()
+                    .eq(ProductSpu::getStatus, BizStatus.SPU_ON_SALE)
+                    .like(keyword != null && !keyword.isBlank(), ProductSpu::getTitle, keyword)
+                    .orderByDesc(ProductSpu::getId));
+
+            List<Map<String, Object>> views = new ArrayList<>();
+            for (ProductSpu spu : spus) {
+                if (views.size() >= limit) {
+                    break;
+                }
+                List<ProductSku> skus = productSkuMapper.selectList(new LambdaQueryWrapper<ProductSku>()
+                        .eq(ProductSku::getSpuId, spu.getId())
+                        .eq(ProductSku::getStatus, BizStatus.SKU_ACTIVE));
+                if (skus.isEmpty()) {
+                    continue;
+                }
+                long sold = 0;
+                BigDecimal minPrice = skus.get(0).getSalePrice() == null
+                        ? BigDecimal.ZERO : skus.get(0).getSalePrice();
+                for (ProductSku sku : skus) {
+                    SkuInventory inv = skuInventoryMapper.selectById(sku.getId());
+                    if (inv != null && inv.getSoldQty() != null) {
+                        sold += inv.getSoldQty();
+                    }
+                    if (sku.getSalePrice() != null && sku.getSalePrice().compareTo(minPrice) < 0) {
+                        minPrice = sku.getSalePrice();
+                    }
+                }
+                Map<String, Object> view = new LinkedHashMap<>();
+                view.put("spuId", spu.getId());
+                view.put("title", spu.getTitle());
+                view.put("minPrice", minPrice);
+                view.put("soldQty", sold);
+                views.add(view);
+            }
+
+            // 按已售件数降序，热门的排在前面
+            views.sort((a, b) -> Long.compare((Long) b.get("soldQty"), (Long) a.get("soldQty")));
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("count", views.size());
+            result.put("products", views);
+            return jsonMapper.writeValueAsString(result);
+        } catch (Exception ex) {
+            return "{\"error\":\"商品推荐查询失败\"}";
+        }
+    }
+
+    /** 经营分析：本店已付款订单的销售额、订单数、客单价 + 热销商品 */
+    private String analyzeSales(Long userId, String argumentsJson) {
+        try {
+            Long storeId = findOwnedStoreId(userId);
+            if (storeId == null) {
+                return "{\"error\":\"你不是任何店铺的商家，无法查看销售数据\"}";
+            }
+            int topN = Math.min(Math.max(parseLimit(argumentsJson), 1), 10);
+
+            List<StoreOrder> paid = storeOrderMapper.selectList(new LambdaQueryWrapper<StoreOrder>()
+                    .eq(StoreOrder::getStoreId, storeId)
+                    .in(StoreOrder::getStatus, "PAID", "SHIPPED", "COMPLETED"));
+
+            int orderCount = paid.size();
+            BigDecimal total = BigDecimal.ZERO;
+            for (StoreOrder sub : paid) {
+                if (sub.getPayableAmount() != null) {
+                    total = total.add(sub.getPayableAmount());
+                }
+            }
+            BigDecimal avg = orderCount == 0 ? BigDecimal.ZERO
+                    : total.divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("storeId", storeId);
+            result.put("paidOrderCount", orderCount);
+            result.put("totalSales", total);
+            result.put("averageOrderValue", avg);
+            result.put("topProducts", topSellingProducts(paid, topN));
+            return jsonMapper.writeValueAsString(result);
+        } catch (Exception ex) {
+            return "{\"error\":\"销售数据分析失败\"}";
+        }
+    }
+
+    /** 从已付款子单里按 SPU 聚合销量，取前 topN 名 */
+    private List<Map<String, Object>> topSellingProducts(List<StoreOrder> paidOrders, int topN) {
+        List<Long> orderIds = new ArrayList<>();
+        for (StoreOrder sub : paidOrders) {
+            orderIds.add(sub.getId());
+        }
+        List<Map<String, Object>> views = new ArrayList<>();
+        if (orderIds.isEmpty()) {
+            return views;
+        }
+
+        List<OrderItem> items = orderItemMapper.selectList(new LambdaQueryWrapper<OrderItem>()
+                .in(OrderItem::getStoreOrderId, orderIds));
+
+        Map<Long, Integer> qtyBySpu = new LinkedHashMap<>();
+        Map<Long, String> titleBySpu = new LinkedHashMap<>();
+        for (OrderItem item : items) {
+            Long spuId = item.getSpuId();
+            int qty = item.getQuantity() == null ? 0 : item.getQuantity();
+            qtyBySpu.put(spuId, qtyBySpu.getOrDefault(spuId, 0) + qty);
+            titleBySpu.putIfAbsent(spuId, item.getProductTitle());
+        }
+
+        for (Map.Entry<Long, Integer> entry : qtyBySpu.entrySet()) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("spuId", entry.getKey());
+            view.put("title", titleBySpu.get(entry.getKey()));
+            view.put("soldQty", entry.getValue());
+            views.add(view);
+        }
+        views.sort((a, b) -> Integer.compare((Integer) b.get("soldQty"), (Integer) a.get("soldQty")));
+        return views.size() <= topN ? views : new ArrayList<>(views.subList(0, topN));
     }
 
 }
