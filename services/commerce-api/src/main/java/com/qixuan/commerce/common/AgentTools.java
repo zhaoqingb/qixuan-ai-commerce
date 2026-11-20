@@ -13,6 +13,8 @@ import org.springframework.web.server.ResponseStatusException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.qixuan.commerce.entity.AiActionApproval;
 import com.qixuan.commerce.entity.AiToolAudit;
+import com.qixuan.commerce.entity.ProductSku;
+import com.qixuan.commerce.entity.ProductSpu;
 import com.qixuan.commerce.entity.RefundRequest;
 import com.qixuan.commerce.entity.Shipment;
 import com.qixuan.commerce.entity.SkuInventory;
@@ -20,6 +22,8 @@ import com.qixuan.commerce.entity.Store;
 import com.qixuan.commerce.entity.StoreOrder;
 import com.qixuan.commerce.entity.TradeOrder;
 import com.qixuan.commerce.mapper.AiToolAuditMapper;
+import com.qixuan.commerce.mapper.ProductSkuMapper;
+import com.qixuan.commerce.mapper.ProductSpuMapper;
 import com.qixuan.commerce.mapper.RefundRequestMapper;
 import com.qixuan.commerce.mapper.ShipmentMapper;
 import com.qixuan.commerce.mapper.SkuInventoryMapper;
@@ -57,12 +61,15 @@ public class AgentTools {
     private final AiApprovalService approvalService;
     private final AiToolAuditMapper auditMapper;
     private final JsonMapper jsonMapper;
+    private final ProductSpuMapper productSpuMapper;
+    private final ProductSkuMapper productSkuMapper;
 
     public AgentTools(TradeOrderMapper tradeOrderMapper, StoreOrderMapper storeOrderMapper,
             ShipmentMapper shipmentMapper, SkuInventoryMapper skuInventoryMapper,
             RefundRequestMapper refundRequestMapper, StoreMapper storeMapper,
             SkuInventoryService skuInventoryService, AiApprovalService approvalService,
-            AiToolAuditMapper auditMapper, JsonMapper jsonMapper) {
+            AiToolAuditMapper auditMapper, JsonMapper jsonMapper,
+            ProductSpuMapper productSpuMapper, ProductSkuMapper productSkuMapper) {
         this.tradeOrderMapper = tradeOrderMapper;
         this.storeOrderMapper = storeOrderMapper;
         this.shipmentMapper = shipmentMapper;
@@ -73,6 +80,8 @@ public class AgentTools {
         this.approvalService = approvalService;
         this.auditMapper = auditMapper;
         this.jsonMapper = jsonMapper;
+        this.productSpuMapper = productSpuMapper;
+        this.productSkuMapper = productSkuMapper;
     }
 
     /**
@@ -90,7 +99,8 @@ public class AgentTools {
                 "type", "string",
                 "description", "订单号，形如 Q202611171710535226"));
         list.add(tool("get_order_status",
-                "查询订单状态、金额，以及每个店铺子单的发货状态和物流单号。只能查当前用户自己的订单。",
+                "查询订单状态、金额，以及每个店铺子单的发货状态和物流单号。只能查当前用户自己的订单。"
+                        + "【只在已知订单号时使用】用户没给单号、只说「我的订单」时，改用 list_my_orders。",
                 orderArgs));
 
         Map<String, Object> myOrdersArgs = new LinkedHashMap<>();
@@ -98,16 +108,21 @@ public class AgentTools {
                 "type", "integer",
                 "description", "返回条数，默认 5，最多 10"));
         list.add(tool("list_my_orders",
-                "列出当前用户最近的几笔订单（订单号、状态、金额、下单时间）。"
-                        + "用户说「我的订单」但不给单号时，先用这个查出来再回答。",
-                myOrdersArgs));
+                "列出【当前用户作为买家】最近的几笔下单记录（订单号、状态、金额、下单时间）。"
+                        + "用户说「我的订单」但不给单号时用这个。"
+                        + "商家要看自己店铺的销售/待发货订单，不要用这个，用 list_pending_shipments。",
+                myOrdersArgs, List.of()));
 
         Map<String, Object> stockArgs = new LinkedHashMap<>();
         stockArgs.put("skuId", Map.of(
                 "type", "integer",
-                "description", "SKU 主键 id，例如 5"));
+                "description", "SKU 主键 id。不确定时先调 list_my_products 获取，不要猜，也不要问用户"));
         list.add(tool("get_sku_stock",
-                "查询某个 SKU 当前的可售库存数量。",
+                "查询【单个】SKU 当前的可售库存。"
+                        + "【只在已知 skuId 时使用】用户给的是商品名而不是 SKU ID 时，改用 list_my_products"
+                        + "（它返回的结果里带 skuId）。"
+                        + "用户问「有哪些商品」「库存够不够」「某商品还有货吗」时，"
+                        + "不要逐个调这个，直接调 list_my_products 一次拿全。",
                 stockArgs));
 
         Map<String, Object> refundArgs = new LinkedHashMap<>();
@@ -116,7 +131,14 @@ public class AgentTools {
                 "description", "返回条数，默认 5，最多 10"));
         list.add(tool("list_my_refunds",
                 "列出当前用户最近的退款申请（退款单号、件数、金额、状态）。",
-                refundArgs));
+                refundArgs, List.of()));
+        list.add(tool("list_my_products",
+                "列出当前商家店铺下的商品及其 SKU 和可用库存。"
+                        + "用户问「有哪些商品」「库存够不够」「某商品还有货吗」时先调这个，"
+                        + "不要反问用户要 SKU ID —— 结果里本来就带 skuId。",
+                Map.of("limit", Map.of("type", "integer",
+                        "description", "返回几个商品，默认 5，最多 20")),
+                List.of()));
 
         // ===== 商家专属：按 store.owner_user_id 判断 =====
         Long storeId = findOwnedStoreId(userId);
@@ -129,13 +151,16 @@ public class AgentTools {
                 "type", "integer",
                 "description", "返回条数，默认 5，最多 10"));
         list.add(tool("list_pending_shipments",
-                "列出自己店铺里待发货的子单（状态 PAID）。发货前用它拿 storeOrderId，不要猜。",
-                pendingArgs));
+                "列出【当前商家自己店铺】里已付款待发货的子单（状态 PAID）。"
+                        + "发货前用它拿 storeOrderId / 子单号，不要猜。"
+                        + "买家查自己的订单不要用这个，用 list_my_orders。",
+                pendingArgs, List.of()));
 
         Map<String, Object> restockArgs = new LinkedHashMap<>();
         restockArgs.put("skuId", Map.of(
                 "type", "integer",
-                "description", "要补货的 SKU 主键 id"));
+                "description", "要补货的 SKU 主键 id。必须原样使用 list_my_products 返回的 skuId，"
+                        + "禁止编造、禁止拿商品序号或价格之类的数字代替"));
         restockArgs.put("qty", Map.of(
                 "type", "integer",
                 "description", "补货件数，必须大于 0，单次不超过 100000"));
@@ -171,12 +196,24 @@ public class AgentTools {
         return stores.isEmpty() ? null : stores.get(0).getId();
     }
 
+    /** 所有参数都必填的简化版（只适合参数确实一个都不能少的工具） */
     private Map<String, Object> tool(String name, String description,
             Map<String, Object> properties) {
+        return tool(name, description, properties, new ArrayList<>(properties.keySet()));
+    }
+
+    /**
+     * 显式指定必填参数。
+     *
+     * required 里绝不能塞可选参数：模型看到"必填但我填不上"会直接放弃调用整个工具，
+     * 表现为"它明明能查，却干脆不调"，排查时很难想到是 schema 的问题。
+     */
+    private Map<String, Object> tool(String name, String description,
+            Map<String, Object> properties, List<String> required) {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("type", "object");
         params.put("properties", properties);
-        params.put("required", new ArrayList<>(properties.keySet()));
+        params.put("required", required);
 
         Map<String, Object> function = new LinkedHashMap<>();
         function.put("name", name);
@@ -214,6 +251,7 @@ public class AgentTools {
             case "list_pending_shipments" -> listPendingShipments(userId, argumentsJson);
             case "restock_sku" -> requestRestock(userId, conversationId, argumentsJson);
             case "ship_order" -> requestShip(userId, conversationId, argumentsJson);
+            case "list_my_products" -> listMyProducts(userId, argumentsJson);
             default -> "{\"error\":\"未知工具：" + name + "\"}";
         };
     }
@@ -265,7 +303,13 @@ public class AgentTools {
             try {
                 store = skuInventoryService.requireOwnedStoreOfSku(userId, skuId);
             } catch (ResponseStatusException ex) {
-                return "{\"error\":\"该SKU不存在，或不属于你的店铺\"}";
+                // 错误信息里直接给出本店可用的 skuId，并明确授权模型直接用它重试：
+                // 不说"请确认"的话，模型会停下来反问用户；说了它才知道可以自己纠正
+                return "{\"error\":\"skuId=" + skuId + " 不存在或不属于你的店铺\","
+                        + "\"availableSkuIds\":" + ownSkuIdsJson(userId) + ","
+                        + "\"instruction\":\"上面这个列表就是本店全部有效 skuId。"
+                        + "如果只有一个，直接用它重新调用 restock_sku 完成用户的请求，"
+                        + "不要反问用户、不要停下来等待确认 —— 用户要的是补货，不是选 SKU。\"}";
             }
 
             Map<String, Object> payload = new LinkedHashMap<>();
@@ -281,6 +325,10 @@ public class AgentTools {
             result.put("approvalNo", approval.getApprovalNo());
             result.put("description", "给 SKU " + skuId + " 补货 " + qty + " 件");
             result.put("hint", "该操作尚未执行，必须由用户确认后才生效。请明确告诉用户「已提交，等待确认」，不要说已经补好了。");
+            // 写操作里所有 id / 单号都是模型爱"改写"的地方。
+            // 直接给出该对用户说的话：模型照抄即可，避免它自己组织语言时改动数字。
+            result.put("displayText", "已提交补货申请：SKU " + skuId + " 补货 " + qty + " 件，"
+                    + "审批单号 " + approval.getApprovalNo() + "，等待你确认后才会生效。");
             return jsonMapper.writeValueAsString(result);
         } catch (Exception ex) {
             return "{\"error\":\"补货申请创建失败\"}";
@@ -434,6 +482,10 @@ public class AgentTools {
             result.put("approvalNo", approval.getApprovalNo());
             result.put("description", "给子单 " + sub.getSubOrderNo() + " 发货（" + carrierCode + " " + trackingNo + "）");
             result.put("hint", "发货尚未执行，必须由用户确认后才生效。请明确告诉用户「已提交，等待确认」，并复述子单号让用户核对。");
+            // 和补货同理：单号 / 快递号必须逐字照抄 tool 返回值，不让模型自己组织时改写
+            result.put("displayText", "已提交发货申请：子单 " + sub.getSubOrderNo()
+                    + "，" + carrierCode + " " + trackingNo
+                    + "，审批单号 " + approval.getApprovalNo() + "，等待你确认后才会发货。");
             return jsonMapper.writeValueAsString(result);
         } catch (Exception ex) {
             return "{\"error\":\"发货申请创建失败\"}";
@@ -504,10 +556,32 @@ public class AgentTools {
         }
     }
 
+    /** 本店所有 skuId，用于在参数错误时直接给出可选值 */
+    private String ownSkuIdsJson(Long userId) {
+        Long storeId = findOwnedStoreId(userId);
+        if (storeId == null) {
+            return "[]";
+        }
+        List<ProductSku> skus = productSkuMapper.selectList(new LambdaQueryWrapper<ProductSku>()
+                .inSql(ProductSku::getSpuId, "SELECT id FROM product_spu WHERE store_id = " + storeId));
+        List<Long> ids = new ArrayList<>();
+        for (ProductSku sku : skus) {
+            ids.add(sku.getId());
+        }
+        return ids.toString();
+    }
+
     private String getSkuStock(String argumentsJson) {
         try {
             JsonNode args = jsonMapper.readTree(argumentsJson);
             long skuId = args.path("skuId").asLong();
+
+            // 参数缺失时不要只回"参数错误"：要告诉模型下一步该做什么，
+            // 它读到这句话下一轮就会去调 list_my_products，而不是反问用户。
+            if (skuId <= 0) {
+                return "{\"error\":\"缺少有效的 skuId。请先调用 list_my_products 获取商品和 SKU 列表，"
+                        + "从返回结果里取 skuId 后再调用本工具。不要反问用户要 SKU ID。\"}";
+            }
 
             SkuInventory inventory = skuInventoryMapper.selectById(skuId);
             if (inventory == null) {
@@ -524,4 +598,53 @@ public class AgentTools {
             return "{\"error\":\"查询库存失败\"}";
         }
     }
+
+    private String listMyProducts(Long userId, String argumentsJson) {
+        try {
+            Long storeId = findOwnedStoreId(userId);
+            if (storeId == null) {
+                return "{\"error\":\"你不是任何店铺的商家，无法查看商品列表\"}";
+            }
+
+            int limit = Math.min(Math.max(parseLimit(argumentsJson), 1), 20);
+
+            List<ProductSpu> spus = productSpuMapper.selectList(new LambdaQueryWrapper<ProductSpu>()
+                    .eq(ProductSpu::getStoreId, storeId)
+                    .orderByDesc(ProductSpu::getId)
+                    .last("LIMIT " + limit));
+
+            List<Map<String, Object>> views = new ArrayList<>();
+            for (ProductSpu spu : spus) {
+                List<ProductSku> skus = productSkuMapper.selectList(new LambdaQueryWrapper<ProductSku>()
+                        .eq(ProductSku::getSpuId, spu.getId()));
+
+                List<Map<String, Object>> skuViews = new ArrayList<>();
+                for (ProductSku sku : skus) {
+                    SkuInventory inv = skuInventoryMapper.selectById(sku.getId());
+                    Map<String, Object> skuView = new LinkedHashMap<>();
+                    skuView.put("skuId", sku.getId());
+                    skuView.put("skuCode", sku.getSkuCode());
+                    skuView.put("price", sku.getSalePrice());
+                    skuView.put("status", sku.getStatus());
+                    skuView.put("availableQty", inv == null ? 0 : inv.getAvailableQty());
+                    skuViews.add(skuView);
+                }
+
+                Map<String, Object> view = new LinkedHashMap<>();
+                view.put("spuId", spu.getId());
+                view.put("title", spu.getTitle());
+                view.put("status", spu.getStatus());
+                view.put("skus", skuViews);
+                views.add(view);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("count", views.size());
+            result.put("products", views);
+            return jsonMapper.writeValueAsString(result);
+        } catch (Exception ex) {
+            return "{\"error\":\"查询商品失败\"}";
+        }
+    }
+
 }

@@ -18,6 +18,7 @@ import { RouterView } from 'vue-router'
         <el-menu-item index="/categories"> 商品分类 </el-menu-item>
         <el-menu-item index="/products"> 商品管理 </el-menu-item>
         <el-menu-item index="/seckill"> 秒杀活动 </el-menu-item>
+        <el-menu-item index="/ai"> AI 助手 </el-menu-item>
       </el-menu>
     </el-aside>
 

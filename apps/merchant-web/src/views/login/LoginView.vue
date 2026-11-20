@@ -20,12 +20,13 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login } from '@/api/auth'
 import { saveToken } from '@/api/http'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const form = reactive({ username: '', password: '' })
 
@@ -39,7 +40,14 @@ async function onSubmit() {
     const res = await login(form)
     saveToken(res.token)
     ElMessage.success('登录成功')
-    router.push('/seckill')
+
+    // 被路由守卫拦下来的，登录后回到原来的目标页
+    const redirect = route.query.redirect
+    if (typeof redirect === 'string' && redirect.startsWith('/')) {
+      router.replace(redirect)
+    } else {
+      router.push('/seckill')
+    }
   } finally {
     loading.value = false
   }
